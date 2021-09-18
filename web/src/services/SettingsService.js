@@ -1,0 +1,15 @@
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL;
+
+export async function getSettings(token) {
+  const settingsUrl = `${API_URL}/settings`;
+  const headers = {
+    authorization: `Bearer ${token}`,
+  };
+  const response = await axios.get(settingsUrl, {
+    headers,
+  });
+
+  return response.data;
+}

@@ -16,4 +16,6 @@ sessionsRouter.post(
   sessionsController.create,
 );
 
+sessionsRouter.post('/logout', sessionsController.close);
+
 export default sessionsRouter;

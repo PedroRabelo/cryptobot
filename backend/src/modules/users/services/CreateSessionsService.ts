@@ -31,7 +31,7 @@ class CreateSessionsService {
       throw new AppError('E-mail/senha incorretos', 401);
     }
 
-    const token = sign({}, authConfig.jwt.secret, {
+    const token = sign({}, authConfig.jwt.secret as string, {
       subject: user.id.toString(),
       expiresIn: authConfig.jwt.expiresIn,
     });

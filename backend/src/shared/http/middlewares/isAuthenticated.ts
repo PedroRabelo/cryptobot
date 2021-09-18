@@ -9,6 +9,12 @@ interface ITokenPayload {
   sub: string;
 }
 
+export const blacklist: string[] = [];
+
+function isBlacklisted(token: string) {
+  return blacklist.some(t => t === token);
+}
+
 export default function isAuthenticated(
   request: Request,
   response: Response,
@@ -23,7 +29,11 @@ export default function isAuthenticated(
   const [, token] = authHeader.split(' ');
 
   try {
-    const decodedToken = verify(token, authConfig.jwt.secret);
+    const decodedToken = verify(token, authConfig.jwt.secret as string);
+
+    if (isBlacklisted(token)) {
+      throw new AppError('JWT token inválido');
+    }
 
     const { sub } = decodedToken as ITokenPayload;
 
