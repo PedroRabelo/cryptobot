@@ -15,10 +15,12 @@ class SymbolsRepository extends Repository<Symbols> {
     return symbol;
   }
 
-  public async deleteAll(): Promise<void> {}
+  public async deleteAll(): Promise<void> {
+    await this.createQueryBuilder().delete().from(Symbols).execute();
+  }
 
   public async bulkInsert(symbols: Symbols): Promise<Symbols> {
-    return await this.bulkInsert(symbols);
+    return await this.save(symbols);
   }
 }
 

@@ -5,6 +5,11 @@ import {
 } from '../../services/SymbolsService';
 import { useHistory } from 'react-router-dom';
 import SymbolRow from './SymbolRow';
+import SelectQuote, {
+  filterSymbolObjects,
+  getDefaultQuote,
+  setDefaultQuote,
+} from '../../components/SelectQuote/SelectQuote';
 
 function Symbols() {
   const history = useHistory();
@@ -12,12 +17,13 @@ function Symbols() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [quote, setQuote] = useState(getDefaultQuote());
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     getSymbols(token)
       .then((symbols) => {
-        setSymbols(symbols);
+        setSymbols(filterSymbolObjects(symbols, quote));
       })
       .catch((err) => {
         if (err.response && err.response.status === 401)
@@ -26,7 +32,7 @@ function Symbols() {
         setError(err.message);
         setSuccess('');
       });
-  }, [isSyncing]);
+  }, [isSyncing, quote]);
 
   function onSyncClick(event) {
     const token = localStorage.getItem('token');
@@ -42,6 +48,11 @@ function Symbols() {
       });
   }
 
+  function onQuoteChange(event) {
+    setQuote(event.target.value);
+    setDefaultQuote(event.target.value);
+  }
+
   return (
     <>
       <div className='row'>
@@ -54,6 +65,9 @@ function Symbols() {
                     <h2 className='fs-5 fw-bold mb-0'>
                       Symbols
                     </h2>
+                  </div>
+                  <div className='col'>
+                    <SelectQuote onChange={onQuoteChange} />
                   </div>
                 </div>
               </div>
