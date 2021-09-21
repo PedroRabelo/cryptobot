@@ -1,24 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useHistory } from 'react-router-dom';
-import { getSettings } from '../../services/SettingsService';
-import { doLogout } from '../../services/AuthService';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  getSettings,
+  updateSettings,
+} from '../../services/SettingsService';
+import Menu from '../../components/Menu/Menu';
+import Symbols from './Symbols';
 
 function Settings() {
-  const history = useHistory();
-  const [settings, setSettings] = useState({
-    email: '',
-    apiUrl: '',
-    accessKey: '',
-    keySecret: '',
-  });
+  const inputApiUrl = useRef('');
+  const inputAccessKey = useRef('');
+  const inputSecretKey = useRef('');
+
   const [error, setError] = useState([]);
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
 
     getSettings(token)
-      .then((response) => {
-        setSettings(response);
+      .then((settings) => {
+        inputApiUrl.current.value = settings.apiUrl;
+        inputAccessKey.current.value = settings.accessKey;
       })
       .catch((err) => {
         setError('Não foi possível buscar os settings');
@@ -29,59 +31,139 @@ function Settings() {
       });
   }, []);
 
-  function onLogout(event) {
+  function onFormSubmit(event) {
+    event.preventDefault();
+
     const token = localStorage.getItem('token');
-    doLogout(token)
-      .then((response) => {
-        localStorage.removeItem('token');
-        history.push('/');
+    updateSettings(
+      {
+        apiUrl: inputApiUrl.current.value,
+        accessKey: inputAccessKey.current.value,
+        secretKey: inputSecretKey.current.value
+          ? inputSecretKey.current.value
+          : null,
+      },
+      token
+    )
+      .then((result) => {
+        if (result) {
+          setError('');
+          setSuccess('Configurações salvas com sucesso');
+          inputSecretKey.current.value = '';
+        } else {
+          setSuccess('');
+          setError(
+            'Não foi possível atualizar as configurações'
+          );
+        }
       })
-      .catch((err) => {
-        setError(err.message);
+      .catch((error) => {
+        setSuccess('');
+        console.error(error.message);
+        setError(
+          'Não foi possível atualizar as configurações'
+        );
       });
   }
 
   return (
-    <main>
-      <section className='vh-lg-100 mt-5 mt-lg-0 bg-soft d-flex align-items-center'>
-        <div className='container'>
-          <p className='text-center'>
-            <Link
-              to='/'
-              className='d-flex align-items-center justify-content-center'
-            >
-              <svg
-                className='icon icon-xs me-2'
-                fill='currentColor'
-                viewBox='0 0 20 20'
-                xmlns='http://www.w3.org/2000/svg'
-              >
-                <path
-                  fillRule='evenodd'
-                  d='M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z'
-                  clipRule='evenodd'
-                ></path>
-              </svg>
-              {settings.email}
-            </Link>
-            <button
-              type='button'
-              className='btn btn-primary'
-              onClick={onLogout}
-            >
-              Logout
-            </button>
-          </p>
-          {error && error.length > 0 ? (
-            <div className='alert alert-danger'>
-              {error}
-            </div>
-          ) : (
-            <></>
-          )}
+    <>
+      <Menu />
+      <main className='content'>
+        <div className='d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4'>
+          <div className='d-block mb-4 mb-md-0'>
+            <h1 className='h4'>Configurações</h1>
+          </div>
         </div>
-      </section>
-    </main>
+        <div className='row'>
+          <div className='col-12'>
+            <div className='card card-body border-0 shadow mb-4'>
+              <h2 className='h5 mb-4'>
+                Informações da Binance
+              </h2>
+              <form onSubmit={onFormSubmit}>
+                <div className='row'>
+                  <div className='col-sm-12 mb-3'>
+                    <div className='form-group'>
+                      <label htmlFor='apiUrl'>
+                        API URL
+                      </label>
+                      <input
+                        ref={inputApiUrl}
+                        className='form-control'
+                        id='apiUrl'
+                        type='text'
+                        placeholder='Your API URL'
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className='row'>
+                  <div className='col-sm-12 mb-3'>
+                    <div className='form-group'>
+                      <label htmlFor='accessKey'>
+                        Chave de Acesso
+                      </label>
+                      <input
+                        ref={inputAccessKey}
+                        className='form-control'
+                        id='accessKey'
+                        type='text'
+                        placeholder='Sua chave de acesso'
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className='row'>
+                  <div className='col-sm-12 mb-3'>
+                    <div className='form-group'>
+                      <label htmlFor='secretKey'>
+                        Chave secreta
+                      </label>
+                      <input
+                        ref={inputSecretKey}
+                        className='form-control'
+                        id='secretKey'
+                        type='password'
+                        placeholder='Sua chave secreta'
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className='row'>
+                  <div className='d-flex justify-content-between flex-wrap flex-md-nowrap'>
+                    <div className='col-sm-3'>
+                      <button
+                        className='btn btn-gray-800 mt-2 animate-up-2'
+                        type='submit'
+                        onClick={onFormSubmit}
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                    {error && error.length ? (
+                      <div className='alert alert-danger mt-2 col-9 py-2'>
+                        {error}
+                      </div>
+                    ) : (
+                      <></>
+                    )}
+                    {success && success.length ? (
+                      <div className='alert alert-success mt-2 col-9 py-2'>
+                        {success}
+                      </div>
+                    ) : (
+                      <></>
+                    )}
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        <Symbols />
+      </main>
+    </>
   );
 }
 

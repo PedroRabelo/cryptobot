@@ -4,6 +4,7 @@ import sessionsRouter from '@modules/users/routes/sessions.routes';
 import passwordRouter from '@modules/users/routes/password.routes';
 import profileRouter from '@modules/users/routes/profile.routes';
 import settingsRouter from '@modules/settings/routes/settings.routes';
+import symbolsRouter from '@modules/symbols/routes/symbols.routes';
 
 const routes = Router();
 
@@ -13,5 +14,6 @@ routes.use('/password', passwordRouter);
 routes.use('/profile', profileRouter);
 
 routes.use('/settings', settingsRouter);
+routes.use('/symbols', symbolsRouter);
 
 export default routes;

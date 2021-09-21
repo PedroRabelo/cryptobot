@@ -1,0 +1,55 @@
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL;
+
+export async function getSymbols(token) {
+  const symbolsUrl = `${API_URL}/symbols`;
+  const headers = {
+    authorization: `Bearer ${token}`,
+  };
+  const response = await axios.get(symbolsUrl, {
+    headers,
+  });
+
+  return response.data;
+}
+
+export async function getSymbol(id, token) {
+  const symbolsUrl = `${API_URL}/symbols/${id}`;
+  const headers = {
+    authorization: `Bearer ${token}`,
+  };
+  const response = await axios.get(symbolsUrl, {
+    headers,
+  });
+
+  return response.data;
+}
+
+export async function updateSymbol(symbol, token) {
+  const symbolsUrl = `${API_URL}/symbols/${symbol.id}`;
+  const headers = {
+    authorization: `Bearer ${token}`,
+  };
+  const response = await axios.patch(symbolsUrl, symbol, {
+    headers,
+  });
+
+  return response.data;
+}
+
+export async function syncSymbols(token) {
+  const symbolsUrl = `${API_URL}/symbols/sync`;
+  const headers = {
+    authorization: `Bearer ${token}`,
+  };
+  const response = await axios.post(
+    symbolsUrl,
+    {},
+    {
+      headers,
+    }
+  );
+
+  return response.data;
+}

@@ -9,12 +9,14 @@ import AppError from '@shared/errors/AppError';
 import '@shared/typeorm';
 import uploadConfig from '@config/upload';
 import helmet from 'helmet';
+import morgan from 'morgan';
 
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: process.env.CORS_ORIGIN }));
 app.use(helmet());
 app.use(express.json());
+app.use(morgan('dev'));
 app.use('/files', express.static(uploadConfig.directory));
 app.use(routes);
 
