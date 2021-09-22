@@ -5,6 +5,11 @@ import AppError from '@shared/errors/AppError';
 import { compare } from 'bcryptjs';
 import { sign } from 'jsonwebtoken';
 import authConfig from '@config/auth';
+import SettingsRepository from '@modules/settings/typeorm/repositories/SettingsRepository';
+import { server } from '@shared/http/server';
+import appWs from '../../../app-ws';
+import appEm from '../../../app-em';
+import Setting from '@modules/settings/typeorm/entities/Setting';
 
 interface IRequest {
   email: string;

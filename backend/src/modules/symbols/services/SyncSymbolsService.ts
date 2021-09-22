@@ -1,10 +1,9 @@
 import { getCustomRepository } from 'typeorm';
 import SettingsRepository from '@modules/settings/typeorm/repositories/SettingsRepository';
-import Exchange from '@shared/utils/exchange';
+import Exchange from '../../../shared/utils/Exchange';
 import Setting from '@modules/settings/typeorm/entities/Setting';
 import { decrypt } from '@shared/utils/crypto';
 import AppError from '@shared/errors/AppError';
-import Symbols from '@modules/symbols/typeorm/entities/Symbols';
 import SymbolsRepository from '@modules/symbols/typeorm/repositories/SymbolsRepository';
 
 interface IRequest {

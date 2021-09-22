@@ -19,6 +19,10 @@ class Exchange {
   public exchangeInfo(): any {
     return this.binance.exchangeInfo();
   }
+
+  public miniTickerStream(callback: any): void {
+    this.binance.websockets.miniTicker(markets => callback(markets));
+  }
 }
 
 export default Exchange;

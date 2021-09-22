@@ -4,12 +4,12 @@ import express, { NextFunction, Request, Response } from 'express';
 import 'express-async-errors';
 import cors from 'cors';
 import { errors } from 'celebrate';
-import routes from './routes';
 import AppError from '@shared/errors/AppError';
 import '@shared/typeorm';
 import uploadConfig from '@config/upload';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import routes from '@shared/http/routes';
 
 const app = express();
 
@@ -38,6 +38,6 @@ app.use(
   },
 );
 
-app.listen(process.env.PORT, () => {
+export const server = app.listen(process.env.PORT, () => {
   console.log('Server started on port 3333');
 });
