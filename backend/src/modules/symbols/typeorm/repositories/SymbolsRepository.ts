@@ -4,7 +4,7 @@ import Symbols from '@modules/symbols/typeorm/entities/Symbols';
 @EntityRepository(Symbols)
 class SymbolsRepository extends Repository<Symbols> {
   public async findByName(name: string): Promise<Symbols | undefined> {
-    const symbol = await this.findOne({ where: { name } });
+    const symbol = await this.findOne({ where: { symbol: name } });
 
     return symbol;
   }

@@ -11,6 +11,7 @@ class ShowSymbolService {
   public async execute({ id }: IRequest): Promise<Symbols> {
     const symbolsRepository = getCustomRepository(SymbolsRepository);
 
+    console.log(id);
     const symbol = await symbolsRepository.findOne(id);
 
     if (!symbol) {

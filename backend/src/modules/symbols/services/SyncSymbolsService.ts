@@ -17,6 +17,10 @@ class SyncSymbolsService {
     const settingsRepository = getCustomRepository(SettingsRepository);
     const settings = await settingsRepository.findByUser(userId);
 
+    const favoritesSymbols = (await symbolsRepository.find())
+      .filter(s => s.isFavorite)
+      .map(s => s.symbol);
+
     if (settings) {
       settings.secretKey = decrypt(settings?.secretKey);
       const exchange = new Exchange(settings as Setting);
@@ -28,6 +32,8 @@ class SyncSymbolsService {
           symbol: any;
           baseAssetPrecision: any;
           quoteAssetPrecision: any;
+          baseAsset: any;
+          quoteAsset: any;
         }) => {
           const minNotionalFilter = item.filters.find(
             f => f.filterType === 'MIN_NOTIONAL',
@@ -40,11 +46,13 @@ class SyncSymbolsService {
             symbol: item.symbol,
             basePrecision: item.baseAssetPrecision,
             quotePrecision: item.quoteAssetPrecision,
+            base: item.baseAsset,
+            quote: item.quoteAsset,
             minNotional: minNotionalFilter
               ? minNotionalFilter.minNotional
               : '1',
             minLotSize: minLotSizeFilter ? minLotSizeFilter.minQty : '1',
-            isFavorite: false,
+            isFavorite: favoritesSymbols.some(s => s === item.symbol),
           };
         },
       );

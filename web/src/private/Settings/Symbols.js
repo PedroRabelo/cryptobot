@@ -10,6 +10,7 @@ import SelectQuote, {
   getDefaultQuote,
   setDefaultQuote,
 } from '../../components/SelectQuote/SelectQuote';
+import SymbolModal from './SymbolModal';
 
 function Symbols() {
   const history = useHistory();
@@ -18,8 +19,15 @@ function Symbols() {
   const [success, setSuccess] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [quote, setQuote] = useState(getDefaultQuote());
+  const [editSymbol, setEditSymbol] = useState({
+    symbol: '',
+    basePrecision: 0,
+    quotePrecision: 0,
+    minLotSize: '',
+    minNotional: '',
+  });
 
-  useEffect(() => {
+  function loadSymbols() {
     const token = localStorage.getItem('token');
     getSymbols(token)
       .then((symbols) => {
@@ -32,6 +40,10 @@ function Symbols() {
         setError(err.message);
         setSuccess('');
       });
+  }
+
+  useEffect(() => {
+    loadSymbols();
   }, [isSyncing, quote]);
 
   function onSyncClick(event) {
@@ -51,6 +63,18 @@ function Symbols() {
   function onQuoteChange(event) {
     setQuote(event.target.value);
     setDefaultQuote(event.target.value);
+  }
+
+  function onEditSymbol(event) {
+    const symbol = event.target.id.replace('edit', '');
+    const symbolObj = symbols.find(
+      (s) => s.symbol === symbol
+    );
+    setEditSymbol(symbolObj);
+  }
+
+  function onModalSubmit(event) {
+    loadSymbols();
   }
 
   return (
@@ -113,6 +137,7 @@ function Symbols() {
                       <SymbolRow
                         key={item.symbol}
                         data={item}
+                        onClick={onEditSymbol}
                       />
                     ))}
                   </tbody>
@@ -165,6 +190,10 @@ function Symbols() {
           </div>
         </div>
       </div>
+      <SymbolModal
+        data={editSymbol}
+        onSubmit={onModalSubmit}
+      />
     </>
   );
 }

@@ -6,6 +6,8 @@ import AppError from '@shared/errors/AppError';
 interface IRequest {
   id: string;
   symbol: string;
+  base: string;
+  quote: string;
   basePrecision: number;
   quotePrecision: number;
   minNotional: number;
@@ -17,6 +19,8 @@ class UpdateSymbolService {
   public async execute({
     id,
     symbol,
+    base,
+    quote,
     basePrecision,
     quotePrecision,
     minNotional,
@@ -31,12 +35,6 @@ class UpdateSymbolService {
       throw new AppError('Símbolo não encontrado.');
     }
 
-    const symbolExists = await symbolsRepository.findByName(symbol);
-
-    if (symbolExists) {
-      throw new AppError('Já existe um símbolo com esta descrição');
-    }
-
     if (basePrecision && basePrecision !== currentSymbol.basePrecision)
       currentSymbol.basePrecision = basePrecision;
 
@@ -48,6 +46,10 @@ class UpdateSymbolService {
 
     if (minLotSize && minLotSize !== currentSymbol.minLotSize)
       currentSymbol.minLotSize = minLotSize;
+
+    if (base && base !== currentSymbol.base) currentSymbol.base = base;
+
+    if (quote && quote !== currentSymbol.quote) currentSymbol.quote = quote;
 
     if (
       isFavorite !== null &&

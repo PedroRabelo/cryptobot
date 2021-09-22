@@ -26,6 +26,8 @@ export default class SymbolsController {
   public async update(request: Request, response: Response): Promise<Response> {
     const {
       symbol,
+      base,
+      quote,
       basePrecision,
       quotePrecision,
       minNotional,
@@ -39,6 +41,8 @@ export default class SymbolsController {
     const updatedSymbol = await updateSymbol.execute({
       id,
       symbol,
+      base,
+      quote,
       basePrecision,
       quotePrecision,
       minNotional,

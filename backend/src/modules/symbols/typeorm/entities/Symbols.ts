@@ -9,6 +9,12 @@ class Symbols extends AbstractEntity {
   @Column()
   symbol: string;
 
+  @Column()
+  base: string;
+
+  @Column()
+  quote: string;
+
   @Column({ name: 'base_precision' })
   basePrecision: number;
 
