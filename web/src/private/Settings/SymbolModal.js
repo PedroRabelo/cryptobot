@@ -58,7 +58,7 @@ function SymbolModal(props) {
     >
       <div
         className='modal-dialog modal-dialog-centered'
-        role='documento'
+        role='document'
       >
         <div className='modal-content'>
           <div className='modal-header'>
