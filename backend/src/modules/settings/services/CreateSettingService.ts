@@ -10,6 +10,7 @@ interface IRequest {
   apiUrl: string;
   accessKey: string;
   secretKey: string;
+  streamUrl: string;
 }
 
 class CreateSettingService {
@@ -18,6 +19,7 @@ class CreateSettingService {
     apiUrl,
     accessKey,
     secretKey,
+    streamUrl,
   }: IRequest): Promise<Setting> {
     const settingsRepository = getCustomRepository(SettingsRepository);
     const usersRepository = getCustomRepository(UsersRepository);
@@ -34,6 +36,7 @@ class CreateSettingService {
       apiUrl,
       accessKey,
       secretKey: encrypt(secretKey),
+      streamUrl,
     });
 
     await settingsRepository.save(setting);

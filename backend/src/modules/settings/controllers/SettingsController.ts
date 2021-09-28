@@ -15,7 +15,7 @@ export default class SettingsController {
 
   public async create(request: Request, response: Response): Promise<Response> {
     const userId = request.user.id;
-    const { apiUrl, accessKey, secretKey } = request.body;
+    const { apiUrl, accessKey, secretKey, streamUrl } = request.body;
 
     const createSetting = new CreateSettingService();
 
@@ -24,6 +24,7 @@ export default class SettingsController {
       apiUrl,
       accessKey,
       secretKey,
+      streamUrl,
     });
 
     return response.json(setting);
@@ -31,7 +32,7 @@ export default class SettingsController {
 
   public async update(request: Request, response: Response): Promise<Response> {
     const userId = request.user.id;
-    const { apiUrl, accessKey, secretKey } = request.body;
+    const { apiUrl, accessKey, secretKey, streamUrl } = request.body;
 
     const updateSetting = new UpdateSettingsService();
 
@@ -40,6 +41,7 @@ export default class SettingsController {
       apiUrl,
       accessKey,
       secretKey,
+      streamUrl,
     });
 
     return response.json(newSetting);

@@ -9,6 +9,7 @@ interface IRequest {
   apiUrl: string;
   accessKey: string;
   secretKey: string;
+  streamUrl: string;
 }
 
 class UpdateSettingsService {
@@ -17,6 +18,7 @@ class UpdateSettingsService {
     apiUrl,
     accessKey,
     secretKey,
+    streamUrl,
   }: IRequest): Promise<Setting> {
     const settingRepository = getCustomRepository(SettingsRepository);
 
@@ -28,10 +30,13 @@ class UpdateSettingsService {
 
     if (apiUrl !== currentSetting.apiUrl) currentSetting.apiUrl = apiUrl;
 
-    if (apiUrl !== currentSetting.accessKey)
+    if (accessKey !== currentSetting.accessKey)
       currentSetting.accessKey = accessKey;
 
     if (secretKey) currentSetting.secretKey = encrypt(secretKey);
+
+    if (streamUrl !== currentSetting.streamUrl)
+      currentSetting.streamUrl = streamUrl;
 
     await settingRepository.save(currentSetting);
 

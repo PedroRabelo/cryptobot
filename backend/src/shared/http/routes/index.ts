@@ -5,6 +5,7 @@ import passwordRouter from '@modules/users/routes/password.routes';
 import profileRouter from '@modules/users/routes/profile.routes';
 import settingsRouter from '@modules/settings/routes/settings.routes';
 import symbolsRouter from '@modules/symbols/routes/symbols.routes';
+import exchangeRouter from '@modules/exchange/routes/exchange.routes';
 
 const routes = Router();
 
@@ -15,5 +16,6 @@ routes.use('/profile', profileRouter);
 
 routes.use('/settings', settingsRouter);
 routes.use('/symbols', symbolsRouter);
+routes.use('/exchange', exchangeRouter);
 
 export default routes;

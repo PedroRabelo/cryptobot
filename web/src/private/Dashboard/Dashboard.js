@@ -3,11 +3,13 @@ import React, { useState } from 'react';
 import Menu from '../../components/Menu/Menu';
 import LineChart from './LineChart';
 import MiniTicker from './MiniTicker/MiniTicker';
+import BookTicker from './BookTicker/BookTicker';
 
 function Dashboard() {
   const [miniTickerState, setMiniTickerState] = useState(
     {}
   );
+  const [bookState, setBookState] = useState({});
 
   const { lastJsonMessage } = useWebSocket(
     process.env.REACT_APP_WS_URL,
@@ -16,11 +18,13 @@ function Dashboard() {
         console.log(`Connected to App WS Server`),
       onMessage: () => {
         if (lastJsonMessage) {
-          if (lastJsonMessage.miniTicker) {
-            if (lastJsonMessage.miniTicker)
-              setMiniTickerState(
-                lastJsonMessage.miniTicker
-              );
+          if (lastJsonMessage.miniTicker)
+            setMiniTickerState(lastJsonMessage.miniTicker);
+          if (lastJsonMessage.book) {
+            lastJsonMessage.book.forEach(
+              (b) => (bookState[b.symbol] = b)
+            );
+            setBookState(bookState);
           }
         }
       },
@@ -42,6 +46,9 @@ function Dashboard() {
         </div>
         <LineChart />
         <MiniTicker data={miniTickerState} />
+        <div className='row'>
+          <BookTicker data={bookState} />
+        </div>
       </main>
     </>
   );

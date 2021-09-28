@@ -10,6 +10,7 @@ function Settings() {
   const inputApiUrl = useRef('');
   const inputAccessKey = useRef('');
   const inputSecretKey = useRef('');
+  const inputStreamUrl = useRef('');
 
   const [error, setError] = useState([]);
   const [success, setSuccess] = useState('');
@@ -20,6 +21,7 @@ function Settings() {
     getSettings(token)
       .then((settings) => {
         inputApiUrl.current.value = settings.apiUrl;
+        inputStreamUrl.current.value = settings.streamUrl;
         inputAccessKey.current.value = settings.accessKey;
       })
       .catch((err) => {
@@ -38,6 +40,7 @@ function Settings() {
     updateSettings(
       {
         apiUrl: inputApiUrl.current.value,
+        streamUrl: inputStreamUrl.current.value,
         accessKey: inputAccessKey.current.value,
         secretKey: inputSecretKey.current.value
           ? inputSecretKey.current.value
@@ -94,6 +97,22 @@ function Settings() {
                         id='apiUrl'
                         type='text'
                         placeholder='Your API URL'
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className='row'>
+                  <div className='col-sm-12 mb-3'>
+                    <div className='form-group'>
+                      <label htmlFor='streamUrl'>
+                        STREAM URL
+                      </label>
+                      <input
+                        ref={inputStreamUrl}
+                        className='form-control'
+                        id='streamUrl'
+                        type='text'
+                        placeholder='Your STREAM URL'
                       />
                     </div>
                   </div>

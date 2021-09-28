@@ -25,6 +25,9 @@ class Setting extends AbstractEntity {
 
   @Column({ name: 'secret_key' })
   secretKey: string;
+
+  @Column({ name: 'stream_url' })
+  streamUrl: string;
 }
 
 export default Setting;
