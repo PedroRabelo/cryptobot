@@ -11,7 +11,7 @@ interface ITokenPayload {
 
 export const blacklist: string[] = [];
 
-function isBlacklisted(token: string) {
+export function isBlacklisted(token: string): boolean {
   return blacklist.some(t => t === token);
 }
 
