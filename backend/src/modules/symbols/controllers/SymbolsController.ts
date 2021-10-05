@@ -14,13 +14,14 @@ export default class SymbolsController {
   }
 
   public async show(request: Request, response: Response): Promise<Response> {
-    const { id } = request.params;
+    const { symbol } = request.params;
 
+    console.log(request.params);
     const showSymbol = new ShowSymbolService();
 
-    const symbol = await showSymbol.execute({ id });
+    const symbols = await showSymbol.execute({ symbol });
 
-    return response.json(symbol);
+    return response.json(symbols);
   }
 
   public async update(request: Request, response: Response): Promise<Response> {

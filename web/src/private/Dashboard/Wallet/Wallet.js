@@ -12,14 +12,17 @@ function Wallet(props) {
     const token = localStorage.getItem('token');
     getBalance(token)
       .then((info) => {
-        const balance = Object.entries(info).map((item) => {
-          return {
-            symbol: item[0],
-            available: item[1].available,
-            onOrder: item[1].onOrder,
-          };
-        });
-        setBalances(balance);
+        const balances = Object.entries(info).map(
+          (item) => {
+            return {
+              symbol: item[0],
+              available: item[1].available,
+              onOrder: item[1].onOrder,
+            };
+          }
+        );
+        if (props.onUpdate) props.onUpdate(balances);
+        setBalances(balances);
       })
       .catch((err) => {
         if (err.response && err.response.status === 401)

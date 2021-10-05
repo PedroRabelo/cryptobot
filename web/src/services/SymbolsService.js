@@ -14,8 +14,8 @@ export async function getSymbols(token) {
   return response.data;
 }
 
-export async function getSymbol(id, token) {
-  const symbolsUrl = `${API_URL}/symbols/${id}`;
+export async function getSymbol(symbol, token) {
+  const symbolsUrl = `${API_URL}/symbols/${symbol}`;
   const headers = {
     authorization: `Bearer ${token}`,
   };

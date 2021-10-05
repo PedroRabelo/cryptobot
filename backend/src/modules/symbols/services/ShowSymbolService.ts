@@ -4,21 +4,20 @@ import Symbols from '@modules/symbols/typeorm/entities/Symbols';
 import AppError from '@shared/errors/AppError';
 
 interface IRequest {
-  id: string;
+  symbol: string;
 }
 
 class ShowSymbolService {
-  public async execute({ id }: IRequest): Promise<Symbols> {
+  public async execute({ symbol }: IRequest): Promise<Symbols> {
     const symbolsRepository = getCustomRepository(SymbolsRepository);
 
-    console.log(id);
-    const symbol = await symbolsRepository.findOne(id);
+    const symbols = await symbolsRepository.findByName(symbol);
 
-    if (!symbol) {
+    if (!symbols) {
       throw new AppError('Símbolo não encontrado.');
     }
 
-    return symbol;
+    return symbols;
   }
 }
 
