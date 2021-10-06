@@ -6,11 +6,15 @@ import WalletSummary from './WalletSummary';
 import SelectSide from './SelectSide';
 import OrderType from './OrderType';
 import QuantityInput from './QuantityInput';
+import { STOP_TYPES } from '../../services/ExchangeService';
+import { useHistory } from 'react-router-dom';
 
 function NewOrderModal(props) {
   const btnClose = useRef('');
   const btnSend = useRef('');
+  const inputTotal = useRef('');
 
+  const history = useHistory();
   const [error, setError] = useState('');
 
   const DEFAULT_ORDER = {
@@ -25,23 +29,34 @@ function NewOrderModal(props) {
 
   const [order, setOrder] = useState(DEFAULT_ORDER);
   const [symbol, setSymbol] = useState({});
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const modal = document.getElementById('modalOrder');
+    modal.addEventListener('hidden.bs.modal', (event) => {
+      setIsVisible(false);
+    });
+    modal.addEventListener('shown.bs.modal', (event) => {
+      setIsVisible(true);
+    });
+  }, [props.wallet]);
 
   useEffect(() => {
     if (!order.symbol) return;
     const token = localStorage.getItem('token');
     getSymbol(order.symbol, token)
-      .then((symbolObject) => setSymbol(symbolObject))
+      .then((symbolObject) => {
+        order.minNotional = symbolObject.minNotional;
+        order.minLotSize = symbolObject.minLotSize;
+        setOrder(order);
+      })
       .catch((err) => {
-        console.error(
-          err.length && err.response
-            ? err.response.data
-            : err.message
-        );
-        setError(
-          err.length && err.response
-            ? err.response.data
-            : err.message
-        );
+        if (err.response && err.response.status === 401) {
+          btnClose.current.click();
+          return history.push('/');
+        }
+        console.error(err);
+        setError(err.message);
       });
   }, [order.symbol]);
 
@@ -79,6 +94,7 @@ function NewOrderModal(props) {
     if (!price) return;
 
     const total = price * quantity;
+    inputTotal.current.value = total;
 
     const minNotional = parseFloat(symbol.minNotional);
     if (total < minNotional) {
@@ -106,6 +122,39 @@ function NewOrderModal(props) {
     return orderType === 'ICEBERG'
       ? 'col-md-6 mb-3'
       : 'col-md-6 mb-3 d-none';
+  }
+
+  function getStopPriceClasses(orderType) {
+    return STOP_TYPES.indexOf(orderType) !== -1
+      ? 'col-md-6 mb-3'
+      : 'col-md-6 mb-3 d-none';
+  }
+
+  function onPriceChange(book) {
+    btnSend.current.disabled = false;
+    setError('');
+
+    const quantity = parseFloat(order.quantity);
+    if (order.type === 'MARKET' && quantity) {
+      if (order.side === 'BUY')
+        inputTotal.current.value = `${
+          quantity * parseFloat(book.ask)
+        }`.substring(0, 8);
+      else
+        inputTotal.current.value = `${
+          quantity * parseFloat(book.bid)
+        }`.substring(0, 8);
+
+      if (
+        parseFloat(inputTotal.current.value) <
+        order.minNotional
+      ) {
+        btnSend.current.disabled = true;
+        return setError(
+          'Min Notional: ' + order.minNotional
+        );
+      }
+    }
   }
 
   return (
@@ -144,7 +193,14 @@ function NewOrderModal(props) {
                   <SelectSymbol onChange={onInputChange} />
                 </div>
                 <div className='col-md-6 mb-3'>
-                  <SymbolPrice symbol={order.symbol} />
+                  {isVisible ? (
+                    <SymbolPrice
+                      symbol={order.symbol}
+                      onChange={onPriceChange}
+                    />
+                  ) : (
+                    <></>
+                  )}
                 </div>
               </div>
               <div className='ro'>
@@ -210,6 +266,39 @@ function NewOrderModal(props) {
                     side={order.side}
                     onChange={onInputChange}
                   />
+                </div>
+                <div
+                  className={getStopPriceClasses(
+                    order.type
+                  )}
+                >
+                  <div className='form-group'>
+                    <label htmlFor='stopPrice'>
+                      Stop Price:
+                    </label>
+                    <input
+                      className='form-control'
+                      id='stopPrice'
+                      type='number'
+                      onChange={onInputChange}
+                      placeholder={order.stopPrice}
+                    />
+                  </div>
+                </div>
+                <div className='col-md-6 mb-3'>
+                  <div className='form-group'>
+                    <label htmlFor='total'>
+                      Preço Total:
+                    </label>
+                    <input
+                      ref={inputTotal}
+                      type='number'
+                      id='total'
+                      className='form-control'
+                      placeholder='0'
+                      disabled
+                    />
+                  </div>
                 </div>
               </div>
             </div>

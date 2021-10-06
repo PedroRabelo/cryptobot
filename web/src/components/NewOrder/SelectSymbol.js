@@ -39,6 +39,7 @@ function SelectSymbol(props) {
           : symbolObjects.map((s) => s.symbol);
         if (symbolNames.length) {
           setSymbols(symbolNames);
+          selectRef.current.value = symbolNames[0];
           props.onChange({
             target: { id: 'symbol', value: symbolNames[0] },
           });

@@ -27,10 +27,12 @@ function SymbolPrice(props) {
       },
       onMessage: () => {
         if (lastJsonMessage) {
-          setBook({
+          const b = {
             bid: lastJsonMessage.b,
             ask: lastJsonMessage.a,
-          });
+          };
+          setBook(b);
+          if (props.onChange) props.onChange(b);
         }
       },
       onError: (event) => console.error(event),
