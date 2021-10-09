@@ -8,6 +8,7 @@ import OrderType from './OrderType';
 import QuantityInput from './QuantityInput';
 import { STOP_TYPES } from '../../services/ExchangeService';
 import { useHistory } from 'react-router-dom';
+import { placeOrder } from '../../services/OrdersService';
 
 function NewOrderModal(props) {
   const btnClose = useRef('');
@@ -39,7 +40,7 @@ function NewOrderModal(props) {
     modal.addEventListener('shown.bs.modal', (event) => {
       setIsVisible(true);
     });
-  }, [props.wallet]);
+  }, []);
 
   useEffect(() => {
     if (!order.symbol) return;
@@ -49,6 +50,7 @@ function NewOrderModal(props) {
         order.minNotional = symbolObject.minNotional;
         order.minLotSize = symbolObject.minLotSize;
         setOrder(order);
+        setSymbol(symbolObject);
       })
       .catch((err) => {
         if (err.response && err.response.status === 401) {
@@ -103,7 +105,22 @@ function NewOrderModal(props) {
     }
   }, [order.quantity, order.price, order.icebergQty]);
 
-  function onSubmit() {}
+  function onSubmit(event) {
+    const token = localStorage.getItem('token');
+    placeOrder(order, token)
+      .then((result) => {
+        btnClose.current.click();
+        if (props.onSubmit) props.onSubmit(result);
+      })
+      .catch((err) => {
+        if (err.response && err.response.status === 401) {
+          btnClose.current.click();
+          return history.push('/');
+        }
+        console.error(err);
+        setError(err.message);
+      });
+  }
 
   function onInputChange(event) {
     setOrder((prevState) => ({
@@ -131,8 +148,7 @@ function NewOrderModal(props) {
   }
 
   function onPriceChange(book) {
-    btnSend.current.disabled = false;
-    setError('');
+    if (order.type !== 'MARKET' || !btnSend.current) return;
 
     const quantity = parseFloat(order.quantity);
     if (order.type === 'MARKET' && quantity) {

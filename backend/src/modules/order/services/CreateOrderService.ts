@@ -12,6 +12,10 @@ interface IRequest {
   options: {
     stopPrice: string;
   };
+  orderId: number;
+  clientOrderId: string;
+  transactTime: number;
+  status: string;
 }
 
 class CreateOrderService {
@@ -23,6 +27,10 @@ class CreateOrderService {
     type,
     side,
     options,
+    orderId,
+    clientOrderId,
+    transactTime,
+    status,
   }: IRequest): Promise<Order> {
     const ordersRepository = getCustomRepository(OrdersRepository);
 
@@ -34,10 +42,10 @@ class CreateOrderService {
       type,
       side,
       stopPrice: options ? options.stopPrice : undefined,
-      orderId: 1,
-      clientOrderId: 'a',
-      transactTime: Date.now(),
-      status: 'NEW',
+      orderId,
+      clientOrderId,
+      transactTime,
+      status,
     });
 
     await ordersRepository.save(newOrder);

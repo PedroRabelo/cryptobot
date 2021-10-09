@@ -27,6 +27,22 @@ class Exchange {
     return this.binance.exchangeInfo();
   }
 
+  public buy(symbol: string, quantity: number, price: number, options: any) {
+    if (price) return this.binance.buy(symbol, quantity, price, options);
+
+    return this.binance.marketBuy(symbol, quantity);
+  }
+
+  public sell(symbol: string, quantity: number, price: number, options: any) {
+    if (price) return this.binance.sell(symbol, quantity, price, options);
+
+    return this.binance.marketSell(symbol, quantity);
+  }
+
+  public cancel(symbol: string, orderId: string) {
+    return this.binance.cancel(symbol, orderId);
+  }
+
   public miniTickerStream(callback: any): void {
     this.binance.websockets.miniTicker(markets => callback(markets));
   }

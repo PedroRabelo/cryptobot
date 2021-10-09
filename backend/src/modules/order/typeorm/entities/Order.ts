@@ -4,10 +4,10 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 @Entity('orders')
 class Order extends AbstractEntity {
   @PrimaryGeneratedColumn()
-  id: number;
+  id?: number;
 
   @Column({ name: 'automation_id' })
-  automationId: number;
+  automationId?: number;
 
   @Column()
   symbol: string;
@@ -22,10 +22,10 @@ class Order extends AbstractEntity {
   transactTime: number;
 
   @Column()
-  type: string;
+  type?: string;
 
   @Column()
-  side: string;
+  side?: string;
 
   @Column()
   status: string;
@@ -34,10 +34,10 @@ class Order extends AbstractEntity {
   isMaker: boolean;
 
   @Column({ name: 'limit_price' })
-  limitPrice: string;
+  limitPrice?: string;
 
   @Column({ name: 'stop_price' })
-  stopPrice: string;
+  stopPrice?: string;
 
   @Column({ name: 'avg_price' })
   avgPrice: number;
@@ -49,10 +49,10 @@ class Order extends AbstractEntity {
   net: number;
 
   @Column()
-  quantity: string;
+  quantity?: string;
 
   @Column()
-  obs: string;
+  obs?: string;
 }
 
 export default Order;

@@ -1894,10 +1894,10 @@ neo-async@^2.6.0:
   resolved "https://registry.yarnpkg.com/neo-async/-/neo-async-2.6.2.tgz#b4aafb93e3aeb2d8174ca53cf163ab7d7308305f"
   integrity sha512-Yd3UES5mWCSqR+qNT93S3UoYUkqAZ9lLg8a7g9rimsWmYGK8cVToA4/sF3RrshdyV3sAGMXVUmpMYOw+dLpOuw==
 
-node-binance-api@^0.13.0:
-  version "0.13.0"
-  resolved "https://registry.yarnpkg.com/node-binance-api/-/node-binance-api-0.13.0.tgz#e99d68a914ec6b7570b8cc97e613d4bf706bed09"
-  integrity sha512-jFjax3wcmHGDnhWdvZWXc7h3ecq0BLS3syyX8o5vK7ZTgRNzhlSgQOozM0Y0RJV1nguIL+yg0mVzpl3oX5mskA==
+node-binance-api@^0.12.5:
+  version "0.12.5"
+  resolved "https://registry.yarnpkg.com/node-binance-api/-/node-binance-api-0.12.5.tgz#53b4e4bf7b9601aa7c9c3ff5f822004cf6622661"
+  integrity sha512-tapf/OCGaMiHrfvOgPu67osXwq03jFq+WtKgDB0XR6uRvSnOf+fMWMsnbyioHcJSXpd3sdcyR5VkjPGZmkUuHw==
   dependencies:
     async "^3.1.0"
     https-proxy-agent "^3.0.1"
