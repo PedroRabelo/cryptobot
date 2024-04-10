@@ -1,10 +1,9 @@
-import { Button } from "./views/components/ui/button";
+import { Login } from "./views/pages/Login";
 
 export function App() {
   return (
     <div>
-      <span>Beholder</span>
-      <Button>Salvar</Button>
+      <Login />
     </div>
   )
 }
