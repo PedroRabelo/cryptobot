@@ -1,0 +1,13 @@
+version: '3.9'
+services:
+  cryptobot-dev:
+    image: postgres:latest
+    volumes:
+      - ../../.volumes/cryptobot/postgresql/:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_DB=cryptobot
+    ports:
+      - "5432:5432"
