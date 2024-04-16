@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { LaunchScreen } from '@/views/components/LaunchScreen';
 import { localStorageKeys } from '../config/localStorageKeys';
 import { ISettings } from '../entities/Settings';
+import { authService } from '../services/authService';
 import { settingsService } from '../services/settingsService';
 
 interface IAuthContextValue {
@@ -38,7 +39,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSignedIn(true);
   }, []);
 
-  const signout = useCallback(() => {
+  const signout = useCallback(async () => {
+    await authService.logout();
+
     localStorage.removeItem(localStorageKeys.ACCESS_TOKEN);
 
     setSignedIn(false);

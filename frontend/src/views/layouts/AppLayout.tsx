@@ -1,17 +1,21 @@
+import { useAuth } from '@/app/hooks/useAuth'
 import { cn } from '@/app/utils/cn'
 import { Dialog, Transition } from '@headlessui/react'
-import { HomeIcon, LogOutIcon, MenuIcon, SettingsIcon, XIcon } from 'lucide-react'
+import { HardDriveIcon, HomeIcon, LayoutGridIcon, LogOutIcon, MenuIcon, SettingsIcon, XIcon } from 'lucide-react'
 import { Fragment, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { ModeToggle } from '../components/ModeToggle'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
+  { name: 'Automations', href: '/automations', icon: LayoutGridIcon },
+  { name: 'Orders', href: '/orders', icon: HardDriveIcon },
   { name: 'Settings', href: '/settings', icon: SettingsIcon },
 ]
 
 export function AppLayout() {
   const location = useLocation()
+  const { signout } = useAuth()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -90,13 +94,13 @@ export function AppLayout() {
                           </ul>
                         </li>
                         <li className="-mx-6 mt-auto">
-                          <a
-                            href="#"
+                          <button
+                            onClick={signout}
                             className="flex items-center gap-x-4 px-6 py-3 text-sm font-semibold leading-6 text-white hover:bg-gray-800"
                           >
                             <LogOutIcon />
                             <span aria-hidden="true">Logout</span>
-                          </a>
+                          </button>
                         </li>
                       </ul>
                     </nav>
@@ -139,7 +143,7 @@ export function AppLayout() {
                 </li>
                 <li className="-mx-6 mt-auto">
                   <button
-                    onClick={() => null}
+                    onClick={signout}
                     className="flex w-full items-center gap-x-4 px-6 py-3 text-sm font-semibold leading-6 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
                     <LogOutIcon />
