@@ -2,6 +2,8 @@ const { isBlacklisted } = require('../controllers/authController');
 const jwt = require('jsonwebtoken');
 
 module.exports = (req, res, next) => {
+  if (!process.env.JWT_SECRET) return res.status(500).json('No JWT Secret.');
+
   const token = req.headers['authorization'];
   if (token) {
     try {

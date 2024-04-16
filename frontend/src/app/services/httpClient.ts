@@ -17,7 +17,7 @@ httpClient.interceptors.request.use((config) => {
 
   const newConfig = { ...config };
   if (accessToken) {
-    newConfig.headers.Authorization = `Bearer ${accessToken}`;
+    newConfig.headers.Authorization = `${accessToken}`;
   }
 
   return newConfig;

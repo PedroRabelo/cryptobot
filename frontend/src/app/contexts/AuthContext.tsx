@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const { isError, isFetching, isSuccess, data } = useQuery({
     queryKey: ['settings'],
-    queryFn: () => settingsService.getSettingsByEmail(),
+    queryFn: () => settingsService.getSettings(),
     enabled: signedIn,
     staleTime: Infinity,
   });

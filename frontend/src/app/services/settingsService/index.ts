@@ -1,5 +1,5 @@
-import { getSettingsByEmail } from './getSettingsByEmail'
+import { getSettings } from './getSettings'
 
 export const settingsService = {
-  getSettingsByEmail
+  getSettings
 }

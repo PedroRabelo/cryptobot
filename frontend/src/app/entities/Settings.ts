@@ -3,4 +3,6 @@ export interface ISettings {
   email: string;
   password: string;
   apiUrl: string;
+  accessKey: string;
+  secretKey: string;
 }
