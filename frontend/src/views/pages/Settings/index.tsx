@@ -5,7 +5,7 @@ import { Input } from "@/views/components/ui/input";
 import { useSettingsController } from "./useSettingsController";
 
 export function Settings() {
-  const { form, onSubmit, isPending } = useSettingsController()
+  const { form, onSubmit, isPending, errorMessage } = useSettingsController()
 
   return (
     <div className="flex min-h-[calc(100vh_-_theme(spacing.18))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8">
@@ -110,7 +110,7 @@ export function Settings() {
             />
           </div>
 
-          <div className="flex items-center pt-8">
+          <div className="flex items-center pt-8 gap-4">
             <Button
               className="w-16"
               type="submit"
@@ -119,6 +119,8 @@ export function Settings() {
 
               Save
             </Button>
+
+            <span className="text-red-500">{errorMessage}</span>
           </div>
         </form>
 

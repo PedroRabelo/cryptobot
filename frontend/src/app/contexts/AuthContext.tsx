@@ -30,7 +30,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryKey: ['settings'],
     queryFn: () => settingsService.getSettings(),
     enabled: signedIn,
-    staleTime: Infinity,
   });
 
   const signin = useCallback((accessToken: string) => {

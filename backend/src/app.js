@@ -20,6 +20,7 @@ app.post('/login', authController.doLogin);
 app.post('/logout', authController.doLogout);
 
 app.get('/settings', authMiddleware, settingsController.getSettings)
+app.patch('/settings', authMiddleware, settingsController.updateSettings)
 
 app.use(require('./middlewares/errorMIddleware'));
 

@@ -8,7 +8,29 @@ function getSettings(id) {
   return settingsModel.findOne({ where: { id } });
 }
 
+async function updateSettings(id, newSettings) {
+  const currentSettings = await getSettings(id);
+
+  if (newSettings.email && newSettings.email !== currentSettings.email)
+    currentSettings.email = newSettings.email;
+
+  if (newSettings.password)
+    currentSettings.password = bcrypt.hashSync(newSettings.password);
+
+  if (newSettings.accessKey && newSettings.accessKey !== currentSettings.accessKey)
+    currentSettings.accessKey = newSettings.accessKey;
+
+  if (newSettings.apiUrl && newSettings.apiUrl !== currentSettings.apiUrl)
+    currentSettings.apiUrl = newSettings.apiUrl;
+
+  if (newSettings.secretKey)
+    currentSettings.secretKey = crypto.encrypt(newSettings.secretKey);
+
+  await currentSettings.save();
+}
+
 module.exports = {
   getSettingsByEmail,
-  getSettings
+  getSettings,
+  updateSettings
 }
