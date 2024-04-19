@@ -30,8 +30,6 @@ export function DataTable<TData, TValue>({
     }
   })
 
-  console.log(table.getFilteredSelectedRowModel().rows[0].original)
-
   return (
     <div className="rounded-md border">
       <Table>
