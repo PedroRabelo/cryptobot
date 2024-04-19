@@ -1,3 +1,4 @@
+import { SelectQuote } from "@/views/components/SelectQuote"
 import { Spinner } from "@/views/components/Spinner"
 import { Button } from "@/views/components/ui/button"
 import { RefreshCwIcon } from "lucide-react"
@@ -6,11 +7,17 @@ import { DataTable } from "./dataTable"
 import { useSymbolsController } from "./useSymbolsController"
 
 export function Symbols() {
-  const { symbols, isLoading, onSyncClick, isSyncing } = useSymbolsController()
+  const { symbols, isLoading, onSyncClick, isSyncing, onQuoteChange } = useSymbolsController()
 
   return (
     <div>
       {isLoading && <span>Carregando...</span>}
+      <div className="flex justify-between mx-auto w-full gap-2 py-4">
+        <h1 className="text-3xl font-semibold">Symbols</h1>
+        <SelectQuote
+          onChange={(value) => onQuoteChange(value)}
+        />
+      </div>
 
       <div className="container mx-auto py-2">
         <DataTable columns={columns} data={symbols} />

@@ -1,5 +1,5 @@
 import { ISymbol } from "@/app/entities/Symbols"
-import { cn } from "@/app/utils/cn"
+import { cn } from "@/app/lib/utils"
 import { Button } from "@/views/components/ui/button"
 import { ColumnDef } from "@tanstack/react-table"
 import { PencilIcon, StarIcon } from "lucide-react"

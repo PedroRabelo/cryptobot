@@ -1,5 +1,6 @@
 import { useAuth } from '@/app/hooks/useAuth'
-import { cn } from '@/app/utils/cn'
+
+import { cn } from '@/app/lib/utils'
 import { Dialog, Transition } from '@headlessui/react'
 import { HardDriveIcon, HomeIcon, LayoutGridIcon, LogOutIcon, MenuIcon, SettingsIcon, XIcon } from 'lucide-react'
 import { Fragment, useState } from 'react'

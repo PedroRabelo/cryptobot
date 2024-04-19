@@ -11,10 +11,6 @@ export function Settings() {
 
       <SettingsForm />
 
-      <div className="mx-auto grid w-full gap-2">
-        <h1 className="text-3xl font-semibold">Symbols</h1>
-      </div>
-
       <Symbols />
 
     </div>
