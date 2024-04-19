@@ -19,7 +19,7 @@ const settingsSchema = z.object({
 
 type FormData = z.infer<typeof settingsSchema>
 
-export function useSettingsController() {
+export function useSettingsFormController() {
   const { settings } = useAuth()
 
   const form = useForm<FormData>({

@@ -1,4 +1,6 @@
 const settingsModel = require('../models/settingsModel');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 function getSettingsByEmail(email) {
   return settingsModel.findOne({ where: { email } });
