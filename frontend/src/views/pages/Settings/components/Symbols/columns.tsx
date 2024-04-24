@@ -2,7 +2,7 @@ import { ISymbol } from "@/app/entities/Symbols"
 import { cn } from "@/app/lib/utils"
 import { Button } from "@/views/components/ui/button"
 import { ColumnDef } from "@tanstack/react-table"
-import { PencilIcon, StarIcon } from "lucide-react"
+import { Pencil, StarIcon } from "lucide-react"
 
 export const columns: ColumnDef<ISymbol>[] = [
   {
@@ -38,14 +38,12 @@ export const columns: ColumnDef<ISymbol>[] = [
     header: "Min. Lot Size",
   },
   {
-    accessorKey: "actions",
-    cell: ({ row }) => {
-      const symbol = row.original
-
+    accessorKey: "Actions",
+    cell: () => {
       return (
-        <Button className="flex gap-2" onClick={(value) => row.toggleSelected(!!value)}>
-          <PencilIcon className="h-6 w-6" />
-          Edit {symbol.symbol}
+        <Button>
+          <Pencil className="h-5 w-5 mr-2" />
+          Editar
         </Button>
       )
     }
