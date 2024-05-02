@@ -27,6 +27,12 @@ async function updateSymbol(symbol, newSymbol) {
     && newSymbol.isFavorite !== currentSymbol.isFavorite)
     currentSymbol.isFavorite = newSymbol.isFavorite;
 
+  if (newSymbol.base && newSymbol.base !== currentSymbol.base)
+    currentSymbol.base = newSymbol.base;
+
+  if (newSymbol.quote && newSymbol.quote !== currentSymbol.quote)
+    currentSymbol.quote = newSymbol.quote;
+
   await currentSymbol.save();
 }
 
