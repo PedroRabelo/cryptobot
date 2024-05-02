@@ -1,6 +1,10 @@
 import { ISymbol } from "@/app/entities/Symbols";
+import { symbolsService } from "@/app/services/symbolsService";
+import { ISymbolParams } from "@/app/services/symbolsService/updateSymbol";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { SubmitErrorHandler, useForm } from "react-hook-form";
+import toast from "react-hot-toast";
 import { z } from "zod";
 
 const symbolsSchema = z.object({
@@ -25,12 +29,39 @@ export function useEditSymbolModalController(symbol: ISymbol) {
     }
   })
 
+  const queryClient = useQueryClient()
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: async (data: ISymbolParams) => symbolsService.updateSymbol(symbol.symbol, data),
+  });
+
   async function onSubmit(values: FormData) {
-    console.log(values)
+    try {
+      const body: ISymbolParams = {
+        isFavorite: values.isFavorite,
+        basePrecision: values.basePrecision,
+        quotePrecision: values.quotePrecision,
+        minLotSize: values.minLotSize,
+        minNotional: values.minNotional
+      }
+
+      await mutateAsync(body);
+
+      queryClient.invalidateQueries({ queryKey: ['symbols'] });
+
+      toast.success('Symbol atualizado com sucesso');
+    } catch {
+      toast.error('Não foi possível atualizar os symbols!');
+    }
+  }
+
+  const onFormError: SubmitErrorHandler<FormData> = (e) => {
+    console.error(e)
   }
 
   return {
     form,
     onSubmit,
+    isPending,
+    onFormError
   }
 }

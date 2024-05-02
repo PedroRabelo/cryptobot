@@ -1,12 +1,10 @@
 import { ISymbol } from "@/app/entities/Symbols"
+import { Spinner } from "@/views/components/Spinner"
 import { Button } from "@/views/components/ui/button"
 import { Checkbox } from "@/views/components/ui/checkbox"
 import {
   Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
+  DialogContent
 } from "@/views/components/ui/dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/views/components/ui/form"
 import { Input } from "@/views/components/ui/input"
@@ -19,7 +17,7 @@ interface IProps {
 }
 
 export function EditSymbolModal({ symbol, open, setClose }: IProps) {
-  const { form, onSubmit } = useEditSymbolModalController(symbol)
+  const { form, onSubmit, isPending, onFormError } = useEditSymbolModalController(symbol)
 
   return (
     <Dialog open={open} onOpenChange={setClose}>
@@ -27,22 +25,28 @@ export function EditSymbolModal({ symbol, open, setClose }: IProps) {
         <Form {...form}>
           <form
             className="grid gap-4 py-4"
-            onSubmit={form.handleSubmit(onSubmit)}>
+            onSubmit={form.handleSubmit(onSubmit, onFormError)}>
+
 
             <FormField
               control={form.control}
               name="isFavorite"
               render={({ field }) => (
                 <FormItem className="col-span-4">
-                  <FormLabel>Symbol:</FormLabel>
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={(checked) => {
-                        return field.onChange(checked)
-                      }}
-                    />
-                  </FormControl>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      disabled value={symbol.symbol} />
+                    <FormLabel>Favorito?</FormLabel>
+
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={(checked) => {
+                          return field.onChange(checked)
+                        }}
+                      />
+                    </FormControl>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -103,14 +107,14 @@ export function EditSymbolModal({ symbol, open, setClose }: IProps) {
                 </FormItem>
               )}
             />
+
+            <Button type="submit">
+              {isPending && <Spinner />}
+              Save
+            </Button>
+
           </form>
         </Form>
-        <DialogHeader>
-          <DialogTitle>Edit symbol</DialogTitle>
-        </DialogHeader>
-        <DialogFooter>
-          <Button type="submit">Save</Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
