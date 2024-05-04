@@ -1,9 +1,10 @@
+import { BookTicker } from "./components/BookTicker"
 import { LineChart } from "./components/LineChart"
 import { MiniTicker } from "./components/MiniTicker"
 import { useDashboardController } from "./useDashboardController"
 
 export function Dashboard() {
-  const { miniTickerState } = useDashboardController()
+  const { miniTickerState, bookState } = useDashboardController()
 
   return (
     <div className="flex flex-col gap-8">
@@ -13,6 +14,9 @@ export function Dashboard() {
 
       <LineChart />
       <MiniTicker miniTickerData={miniTickerState} />
+      <div className="grid grid-cols-2">
+        <BookTicker bookTickerData={bookState} />
+      </div>
     </div>
   )
 }

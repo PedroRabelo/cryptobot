@@ -1,9 +1,9 @@
-import { useSymbols } from "@/app/hooks/useSymbols"
-import { filterSymbolNames, getDefaultQuote } from "@/views/components/SelectQuote"
-import { useQueryClient } from "@tanstack/react-query"
-import { useEffect, useState } from "react"
+import { useSymbols } from "@/app/hooks/useSymbols";
+import { filterSymbolNames, getDefaultQuote } from "@/views/components/SelectQuote";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
-export function useMiniTickerController() {
+export function useBookTickerController() {
 
   const [symbols, setSymbols] = useState<string[]>()
   const [quote, setQuote] = useState(getDefaultQuote())
@@ -21,7 +21,8 @@ export function useMiniTickerController() {
   }
 
   return {
-    onQuoteChange,
-    symbols
+    symbols,
+    onQuoteChange
   }
+
 }

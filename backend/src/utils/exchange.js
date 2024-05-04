@@ -17,11 +17,16 @@ module.exports = (settings) => {
   }
 
   function miniTickerStream(callback) {
-    binance.websockets.miniTicker(markets => callback(markets))
+    binance.websockets.miniTicker(markets => callback(markets));
+  }
+
+  function bookStream(callback) {
+    binance.websockets.bookTickers(order => callback(order));
   }
 
   return {
     exchangeInfo,
-    miniTickerStream
+    miniTickerStream,
+    bookStream
   }
 }

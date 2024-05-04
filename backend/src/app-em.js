@@ -14,6 +14,15 @@ module.exports = (settings, wss) => {
         client.send(JSON.stringify({ miniTicker: markets }));
       }
     });
+
+    const books = Object.entries(markets).map(mkt => {
+      return { symbol: mkt[0], bestAsk: mkt[1].close, bestBid: mkt[1].close }
+    })
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({ books: books }));
+      }
+    });
   });
 
   console.log('App Exchange Monitor is running');
