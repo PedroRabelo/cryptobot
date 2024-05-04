@@ -7,6 +7,7 @@ export interface ISettingsParams {
   apiUrl: string;
   accessKey: string;
   secretKey?: string | null;
+  streamUrl: string;
 }
 
 export async function updateSettings(params: ISettingsParams) {

@@ -79,6 +79,20 @@ export function SettingsForm() {
 
           <FormField
             control={form.control}
+            name="streamUrl"
+            render={({ field }) => (
+              <FormItem className="col-span-4">
+                <FormLabel>Stream URL</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter the Stream URL" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="accessKey"
             render={({ field }) => (
               <FormItem className=" col-start-1 col-span-4">

@@ -14,7 +14,8 @@ const settingsSchema = z.object({
   confirmPassword: z.string().optional(),
   apiUrl: z.string().min(32),
   accessKey: z.string().min(32),
-  secretKey: z.string().optional()
+  secretKey: z.string().optional(),
+  streamUrl: z.string().min(32),
 })
 
 type FormData = z.infer<typeof settingsSchema>
@@ -30,7 +31,8 @@ export function useSettingsFormController() {
       confirmPassword: "",
       apiUrl: settings?.apiUrl,
       accessKey: settings?.accessKey,
-      secretKey: ""
+      secretKey: "",
+      streamUrl: settings?.streamUrl,
     }
   })
 
@@ -55,7 +57,8 @@ export function useSettingsFormController() {
         password: values.password ? values.password : null,
         apiUrl: values.apiUrl,
         accessKey: values.accessKey,
-        secretKey: values.secretKey ? values.secretKey : null
+        secretKey: values.secretKey ? values.secretKey : null,
+        streamUrl: values.streamUrl,
       }
 
       await mutateAsync(body);

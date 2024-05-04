@@ -4,7 +4,7 @@ import useWebSocket from 'react-use-websocket';
 export function useDashboardController() {
 
   const [miniTickerState, setMiniTickerState] = useState<any>()
-  const [bookState, setBookState] = useState<any>()
+  const [bookState, setBookState] = useState<any>([])
 
   const { lastJsonMessage } = useWebSocket<{ miniTicker: any, books: any }>(import.meta.env.VITE_WS_URL, {
     onOpen: () => console.log(`Connected to App WS Server`),

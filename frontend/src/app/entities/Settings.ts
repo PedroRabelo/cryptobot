@@ -5,4 +5,5 @@ export interface ISettings {
   apiUrl: string;
   accessKey: string;
   secretKey: string;
+  streamUrl: string
 }
