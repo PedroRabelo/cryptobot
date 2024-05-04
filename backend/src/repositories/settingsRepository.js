@@ -27,6 +27,11 @@ function getSettings(id) {
   return settingsModel.findOne({ where: { id } });
 }
 
+async function getDefaultSettings() {
+  const settings = await settingsModel.findOne({ where: { id: process.env.DEFAULT_SETTINGS_ID || 1 } });
+  return getSettingsDecrypted(settings.id);
+}
+
 async function updateSettings(id, newSettings) {
   const currentSettings = await getSettings(id);
 
@@ -52,5 +57,6 @@ module.exports = {
   getSettingsDecrypted,
   getSettingsByEmail,
   getSettings,
-  updateSettings
+  updateSettings,
+  getDefaultSettings
 }

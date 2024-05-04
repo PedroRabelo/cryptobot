@@ -56,6 +56,10 @@ export function filterSymbolObjects(symbols: ISymbol[], quote: string) {
   })
 }
 
+export function filterSymbolNames(symbols: ISymbol[], quote: string) {
+  return filterSymbolObjects(symbols, quote).map(s => s.symbol)
+}
+
 export function SelectQuote({ onChange }: IProps) {
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState(getDefaultQuote())
