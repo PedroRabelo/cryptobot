@@ -21,7 +21,7 @@ export function useDashboardController() {
         }
       }
     },
-    queryParams: {},
+    queryParams: { "token": localStorage.getItem('cryptobot:accessToken')! },
     onError: (err) => console.error(err),
     shouldReconnect: () => true,
     reconnectInterval: 3000,
