@@ -6,24 +6,29 @@ module.exports = (settings, wss) => {
 
   const exchange = require('./utils/exchange')(settings);
 
-  exchange.miniTickerStream((markets) => {
-    // console.log(!wss.clients);
+  function broadcast(jsonObject) {
     if (!wss || !wss.clients) return;
     wss.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ miniTicker: markets }));
+        client.send(JSON.stringify(jsonObject));
       }
     });
+  }
+
+  exchange.miniTickerStream((markets) => {
+    broadcast({ miniTicker: markets });
 
     const books = Object.entries(markets).map(mkt => {
       return { symbol: mkt[0], bestAsk: mkt[1].close, bestBid: mkt[1].close }
     })
-    wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ books: books }));
-      }
-    });
+    broadcast({ books: books })
   });
+
+  exchange.userDataStream(balanceData => {
+    broadcast({ balance: balanceData })
+  },
+    executionData => { console.log(executionData) }
+  )
 
   console.log('App Exchange Monitor is running');
 }

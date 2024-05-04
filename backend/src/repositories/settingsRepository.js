@@ -47,8 +47,10 @@ async function updateSettings(id, newSettings) {
   if (newSettings.apiUrl && newSettings.apiUrl !== currentSettings.apiUrl)
     currentSettings.apiUrl = newSettings.apiUrl;
 
-  if (newSettings.secretKey)
+  if (newSettings.secretKey) {
     currentSettings.secretKey = crypto.encrypt(newSettings.secretKey);
+    clearSettingsCache(id);
+  }
 
   if (newSettings.streamUrl && newSettings.streamUrl !== currentSettings.streamUrl)
     currentSettings.streamUrl = newSettings.streamUrl;

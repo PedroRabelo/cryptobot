@@ -5,15 +5,17 @@ export function useDashboardController() {
 
   const [miniTickerState, setMiniTickerState] = useState<any>()
   const [bookState, setBookState] = useState<any>([])
+  const [balanceState, setBalanceState] = useState<any>([])
 
-  const { lastJsonMessage } = useWebSocket<{ miniTicker: any, books: any }>(import.meta.env.VITE_WS_URL, {
+  const { lastJsonMessage } = useWebSocket<{ miniTicker: any, books: any, balance: any }>(import.meta.env.VITE_WS_URL, {
     onOpen: () => console.log(`Connected to App WS Server`),
     onMessage: () => {
       if (lastJsonMessage) {
         if (lastJsonMessage.miniTicker) {
           setMiniTickerState(lastJsonMessage.miniTicker)
-        }
-        if (lastJsonMessage.books) {
+        } else if (lastJsonMessage.balance) {
+          setBalanceState(lastJsonMessage.balance);
+        } else if (lastJsonMessage.books) {
           lastJsonMessage.books.forEach((b: any) => bookState[b.symbol] = b)
           setBookState(bookState)
         }
@@ -28,6 +30,7 @@ export function useDashboardController() {
 
   return {
     miniTickerState,
-    bookState
+    bookState,
+    balanceState
   }
 }
