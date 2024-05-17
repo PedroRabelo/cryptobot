@@ -15,7 +15,8 @@ export function Dashboard() {
         <SelectQuote onChange={onQuoteChange} />
       </div>
 
-      <CandleChart symbol={quote!} />
+      <CandleChart symbol={"BTCUSD"} />
+
       <MiniTicker miniTickerData={miniTickerState} />
       <div className="grid grid-cols-2">
         <BookTicker bookTickerData={bookState} />

@@ -13,7 +13,7 @@ export function useCandleChartController(symbol: string) {
       script.innerHTML = `
         {
           "autosize": true,
-          "symbol": "BINANCE:${symbol}USDT",
+          "symbol": "BINANCE:${symbol}",
           "interval": "D",
           "timezone": "Etc/UTC",
           "theme": "dark",
