@@ -21,6 +21,7 @@ export function SelectSymbol({ symbol, onChange, showOnlyFavorites, disabled = f
 
   const fetchSymbols = useCallback(async () => {
     const data = await symbolsService.getSymbols()
+    console.log(onlyFavorites)
     const symbolNames = onlyFavorites
       ? data.filter(s => s.isFavorite).map(s => s.symbol)
       : data.map(s => s.symbol)
@@ -38,11 +39,9 @@ export function SelectSymbol({ symbol, onChange, showOnlyFavorites, disabled = f
   }, [])
 
   function onFavoriteClick() {
+
     setOnlyFavorites(!onlyFavorites)
   }
-
-  // Aula 05 Módulo 4
-
   const selectSymbol = useMemo(() => {
     return (
       <div className="flex">
@@ -50,7 +49,7 @@ export function SelectSymbol({ symbol, onChange, showOnlyFavorites, disabled = f
           variant={"secondary"}
           onClick={() => onFavoriteClick()}
         >
-          <Star className={cn(!onlyFavorites && 'fill-yellow-400', 'text-yellow-400')} />
+          <Star className={cn(onlyFavorites && 'fill-yellow-400', 'text-yellow-400')} />
         </Button>
         <Select
           disabled={disabled}

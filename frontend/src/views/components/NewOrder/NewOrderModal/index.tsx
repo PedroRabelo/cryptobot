@@ -9,12 +9,13 @@ import {
 } from "@/views/components/ui/dialog"
 import { CreditCard } from "lucide-react"
 import { SelectSymbol } from "../../SelectSymbol"
+import { SymbolPrice } from "../SymbolPrice"
+import { useNewOrderModalController } from "./useNewOrderModalController"
 
 export function NewOrderModal() {
+  const { onInputChange, order } = useNewOrderModalController()
 
-  function onInputChange(event: any) {
-    console.log(event)
-  }
+  // MODULO 4 AULA 6
 
   return (
     <Dialog>
@@ -24,16 +25,18 @@ export function NewOrderModal() {
           New Order
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
           <DialogTitle>New Order</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
+        <div className="grid grid-cols-12 gap-2 py-4">
+          <div className="col-span-4">
             <SelectSymbol
-              onChange={onInputChange}
-
+              onChange={(event) => onInputChange(event)}
             />
+          </div>
+          <div className="col-span-8">
+            <SymbolPrice symbol={order.symbol} />
           </div>
         </div>
         <DialogFooter>
