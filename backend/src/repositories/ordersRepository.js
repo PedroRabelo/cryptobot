@@ -3,6 +3,25 @@ const Sequelize = require('sequelize');
 
 const PAGE_SIZE = 10
 
+const orderStatus = {
+  FILLED: 'FILLED',
+  PARTIALLY_FILLED: 'PARTIALLY_FILLED',
+  CANCELED: 'CANCELED',
+  REJECTED: 'REJECTED',
+  NEW: 'NEW'
+}
+
+const orderTypes = {
+  STOP_LOSS: 'STOP_LOSS',
+  STOP_LOSS_LIMIT: 'STOP_LOSS_LIMIT',
+  TAKE_PROFIT: 'TAKE_PROFIT',
+  TAKE_PROFIT_LIMIT: 'TAKE_PROFIT_LIMIT',
+  MARKET: 'MARKET',
+  LIMIT: 'LIMIT',
+  ICEBERG: 'ICEBERG',
+  TRAILING_STOP: 'TRAILING_STOP'
+}
+
 function getOrders(symbol, page = 1) {
   const options = {
     where: {},

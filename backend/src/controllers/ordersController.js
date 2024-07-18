@@ -1,4 +1,5 @@
 const ordersRepository = require('../repositories/ordersRepository');
+const settingsRepository = require('../repositories/settingsRepository');
 
 async function getOrders(req, res, next) {
   const symbol = req.params.symbol && req.params.symbol.toUpperCase();
@@ -8,7 +9,21 @@ async function getOrders(req, res, next) {
 }
 
 async function placeOrder(req, res, next) {
+  const id = res.locals.token.id;
+  const settings = await settingsRepository.getSettingsDecrypted(id);
+  const exchange = require('../utils/exchange')(settings);
+
   const { side, symbol, quantity, price, type, options, automationId } = req.body;
+
+  let result;
+  try {
+    if (side === 'BUY')
+      result = await exchange.buy(symbol, quantity, price, options);
+    else
+      result = await exchange.sell(symbol, quantity, price, options);
+  } catch (err) {
+    return res.status(400).json(err.body);
+  }
 
   const order = await ordersRepository.insertOrder({
     automationId,
@@ -19,22 +34,39 @@ async function placeOrder(req, res, next) {
     limitPrice: price,
     stopPrice: options ? options.stopPrice : null,
     icebergQuantity: options ? options.icebergQty : null,
-    orderId: 1,
-    clientOrderId: 'a',
-    transactTime: Date.now(),
-    status: 'NEW'
+    orderId: result.orderId,
+    clientOrderId: result.clientOrderId,
+    transactTime: result.transactTime,
+    status: result.status
   })
 
   res.status(201).json(order.get({ plain: true }));
 }
 
 async function cancelOrder(req, res, next) {
-  res.sendStatus(200);
+  const id = res.locals.token.id;
+  const settings = await settingsRepository.getSettingsDecrypted(id);
+  const exchange = require('../utils/exchange')(settings);
+
+  const { symbol, orderId } = req.params;
+
+  try {
+    result = await exchange.cancel(symbol, orderId);
+  } catch (err) {
+    return res.status(400).json(err.body);
+  }
+
+  const order = await ordersRepository.updateOrderByOrderId(result.orderId, result.origClientOrderId, {
+    status: result.status
+  })
+
+  res.json(order.get({ plain: true }));
 }
 
 module.exports = {
   getOrders,
-  placeOrder
+  placeOrder,
+  cancelOrder
 }
 
-// MODULO 04 LIÇÃO 2 AULA 04
+// MODULO 4 LIÇÃO 3 AULA 1
