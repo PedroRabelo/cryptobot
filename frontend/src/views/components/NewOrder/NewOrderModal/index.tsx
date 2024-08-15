@@ -15,8 +15,6 @@ import { useNewOrderModalController } from "./useNewOrderModalController"
 export function NewOrderModal() {
   const { onInputChange, order } = useNewOrderModalController()
 
-  // MODULO 4 AULA 6
-
   return (
     <Dialog>
       <DialogTrigger asChild>

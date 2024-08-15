@@ -33,6 +33,9 @@ app.use('/exchange', authMiddleware, exchangeRouter);
 const ordersRouter = require('./routers/ordersRouter');
 app.use('/orders', authMiddleware, ordersRouter);
 
+const monitorsRouter = require('./routers/monitorsRouter');
+app.use('/monitors', authMiddleware, monitorsRouter);
+
 app.use(require('./middlewares/errorMIddleware'));
 
 module.exports = app;
