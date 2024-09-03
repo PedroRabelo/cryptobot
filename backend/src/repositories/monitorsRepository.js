@@ -87,5 +87,6 @@ module.exports = {
   deleteMonitor,
   getMonitors,
   getMonitor,
-  updateMonitor
+  updateMonitor,
+  getActiveMonitors
 }
