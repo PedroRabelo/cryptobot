@@ -91,7 +91,7 @@ function processExecutionData(executionData, broadcastLabel) {
 function startUserDataMonitor(broadcastLabel, logs) {
   if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
 
-  const [balanceBroadcast, executionBroadcast] = broadcastLabel.split(',');
+  const [balanceBroadcast, executionBroadcast] = broadcastLabel ? broadcastLabel.split(',') : [null, null];
 
   loadWallet();
 
@@ -112,17 +112,31 @@ function startUserDataMonitor(broadcastLabel, logs) {
 }
 
 function processChartData(symbol, indexes, interval, ohlc) {
-  indexes.map(index => {
-    switch (index) {
-      case indexKeys.RSI: {
-        return beholder.updateMemory(symbol, indexKeys.RSI, interval, RSI(ohlc.close));
+  if (typeof indexes === 'string') indexes = indexes.split(',');
+  if (indexes && indexes.length > 0) {
+    indexes.map(index => {
+
+      const params = index.split('_');
+      const indexName = params[0];
+      params.splice(0, 1);
+
+      let calc;
+
+      switch (indexName) {
+        case indexKeys.RSI: calc = RSI(ohlc.close, ...params); break;
+        case indexKeys.MACD: calc = MACD(ohlc.close, ...params); break;
+        case indexKeys.SMA: calc = SMA(ohlc.close, ...params); break;
+        case indexKeys.EMA: calc = EMA(ohlc.close, ...params); break;
+        case indexKeys.BOLLINGER_BANDS: calc = BOLLINGER_BANDS(ohlc.close, ...params); break;
+        case indexKeys.STOCH_RSI: calc = STOCH_RSI(ohlc.close, ...params); break;
+        default: return;
       }
-      case indexKeys.MACD: {
-        return beholder.updateMemory(symbol, indexKeys.MACD, interval, MACD(ohlc.close));
-      }
-      default: return;
-    }
-  })
+
+      if (logs) console.log(`${index} calculated: ${JSON.stringify(calc)}`);
+
+      return beholder.updateMemory(symbol, index, interval, calc);
+    })
+  }
 }
 
 function startChartMonitor(symbol, interval, indexes, broadcastLabel, logs) {
@@ -146,7 +160,7 @@ function startChartMonitor(symbol, interval, indexes, broadcastLabel, logs) {
       WSS.broadcast({ [broadcastLabel]: lastCandle });
     }
 
-    processChartData(symbol, indexes, interval, ohlc);
+    processChartData(symbol, indexes, interval, ohlc, logs);
   });
   console.log(`Chart Monitor has started at ${symbol}_${interval}`);
 }
