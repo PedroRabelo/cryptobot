@@ -73,6 +73,11 @@ module.exports = (settings) => {
     })
   }
 
+  function terminateChartStream(symbol, interval) {
+    binance.websockets.terminate(`${symbol.toLowerCase()}@kline_${interval}`);
+    console.log(`Chart Stream ${symbol.toLowerCase()}@kline_${interval} terminated`);
+  }
+
   return {
     exchangeInfo,
     miniTickerStream,
@@ -84,6 +89,7 @@ module.exports = (settings) => {
     cancel,
     orderStatus,
     orderTrade,
-    chartStream
+    chartStream,
+    terminateChartStream
   }
 }

@@ -151,6 +151,19 @@ function startChartMonitor(symbol, interval, indexes, broadcastLabel, logs) {
   console.log(`Chart Monitor has started at ${symbol}_${interval}`);
 }
 
+function stopChartMonitor(symbol, interval, indexes, logs) {
+  if (!symbol) return new Error(`You can't start a chart monitor without a symbol`);
+  if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
+
+  exchange.terminateChartStream(symbol, interval);
+  if (logs) console.log(`Chart Monitor ${symbol}_${interval} stopped!`);
+
+  beholder.deleteMemory(symbol, 'LAST_CANDLE', interval);
+
+  if (indexes && Array.isArray(indexes))
+    indexes.map(ix => beholder.deleteMemory(symbol, ix, interval));
+}
+
 async function init(settings, wssInstance, beholderInstance) {
   if (!settings || !beholderInstance) return new Error('Exchange Monitor not initialized yet.');
 
@@ -183,5 +196,6 @@ async function init(settings, wssInstance, beholderInstance) {
 
 module.exports = {
   init,
-  startChartMonitor
+  startChartMonitor,
+  stopChartMonitor
 }
