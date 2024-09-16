@@ -4,7 +4,8 @@ const monitorTypes = {
   MINI_TICKER: 'MINI_TICKER',
   BOOK: 'BOOK',
   USER_DATA: 'USER_DATA',
-  CANDLES: 'CANDLES'
+  CANDLES: 'CANDLES',
+  TICKER: 'TICKER'
 }
 
 async function monitorExists(type, symbol, interval) {

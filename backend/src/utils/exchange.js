@@ -78,6 +78,18 @@ module.exports = (settings) => {
     console.log(`Chart Stream ${symbol.toLowerCase()}@kline_${interval} terminated`);
   }
 
+  async function tickerStream(symbol, callback) {
+    const streamUrl = binance.websockets.prevDay(symbol, (data, converted) => {
+      callback(converted)
+    })
+    if (LOGS) console.log(`Ticker Stream connected at ${streamUrl}`);
+  }
+
+  function terminateTickerStream(symbol) {
+    binance.websockets.terminate(`${symbol.toLowerCase()}@ticker`);
+    console.log(`Ticker Stream disconnected at ${symbol.toLowerCase()}@ticker`);
+  }
+
   return {
     exchangeInfo,
     miniTickerStream,
@@ -90,6 +102,8 @@ module.exports = (settings) => {
     orderStatus,
     orderTrade,
     chartStream,
-    terminateChartStream
+    terminateChartStream,
+    tickerStream,
+    terminateTickerStream
   }
 }

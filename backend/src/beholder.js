@@ -37,7 +37,15 @@ function deleteMemory(symbol, index, interval) {
   }
 }
 
-function getMemory() {
+function getMemory(symbol, index, interval) {
+  if (symbol && index) {
+    const indexKey = interval ? `${index}_${interval}` : index;
+    const memoryKey = `${symbol}:${indexKey}`;
+
+    const result = MEMORY[memoryKey];
+    return typeof result === 'object' ? { ...result } : result;
+  }
+
   return { ...MEMORY };
 }
 

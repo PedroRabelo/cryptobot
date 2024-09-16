@@ -166,16 +166,82 @@ function startChartMonitor(symbol, interval, indexes, broadcastLabel, logs) {
 }
 
 function stopChartMonitor(symbol, interval, indexes, logs) {
-  if (!symbol) return new Error(`You can't start a chart monitor without a symbol`);
+  if (!symbol) return new Error(`You can't stop a chart monitor without a symbol`);
   if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
 
   exchange.terminateChartStream(symbol, interval);
   if (logs) console.log(`Chart Monitor ${symbol}_${interval} stopped!`);
 
-  beholder.deleteMemory(symbol, 'LAST_CANDLE', interval);
+  beholder.deleteMemory(symbol, indexKeys.LAST_CANDLE, interval);
 
   if (indexes && Array.isArray(indexes))
     indexes.map(ix => beholder.deleteMemory(symbol, ix, interval));
+}
+
+function getLightTicker(data) {
+  delete data.eventType;
+  delete data.eventTime;
+  delete data.symbol;
+  delete data.openTime;
+  delete data.closeTime;
+  delete data.firstTradeId;
+  delete data.lastTradeId;
+  delete data.numTrades;
+  delete data.quoteVolume;
+  delete data.closeQty;
+  delete data.bestBidQty;
+  delete data.bestAskQty;
+  delete data.volume;
+
+  data.priceChange = parseFloat(data.priceChange);
+  data.percentChange = parseFloat(data.percentChange);
+  data.averagePrice = parseFloat(data.averagePrice);
+  data.prevClose = parseFloat(data.prevClose);
+  data.high = parseFloat(data.high);
+  data.low = parseFloat(data.low);
+  data.open = parseFloat(data.open);
+  data.close = parseFloat(data.close);
+  data.bestBid = parseFloat(data.bestBid);
+  data.bestAsk = parseFloat(data.bestAsk);
+
+  return data;
+}
+
+function startTickerMonitor(symbol, broadcastLabel, logs) {
+  if (!symbol) return new Error(`You can't start a ticker monitor without a symbol`);
+  if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
+
+  exchange.tickerStream(symbol, async (data) => {
+    if (logs) console.log(data);
+
+    try {
+      const ticker = getLightTicker({ ...data });
+      const currentMemory = beholder.getMemory(symbol, indexKeys.TICKER);
+
+      const newMemory = {};
+      newMemory.previous = currentMemory ? currentMemory.current : ticker;
+      newMemory.current = ticker;
+
+      beholder.updateMemory(data.symbol, indexKeys.TICKER, null, newMemory);
+
+      if (WSS && broadcastLabel) WSS.broadcastLabel({ [broadcastLabel]: data });
+    } catch (err) {
+      if (logs) console.error(err)
+    }
+  })
+
+  console.log(`Ticker Monitor has started for ${symbol}`)
+}
+
+
+function stopTickerMonitor(symbol, logs) {
+  if (!symbol) return new Error(`You can't stop a ticker monitor without a symbol`);
+  if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
+
+  exchange.terminateTickerStream(symbol);
+  if (logs) console.log(`Ticker Monitor ${symbol} stopped!`);
+
+  beholder.deleteMemory(symbol, indexKeys.TICKER);
 }
 
 async function init(settings, wssInstance, beholderInstance) {
@@ -201,6 +267,8 @@ async function init(settings, wssInstance, beholderInstance) {
             monitor.indexes.split(','),
             monitor.broadcastLabel,
             monitor.logs);
+        case monitorTypes.TICKER:
+          return startTickerMonitor(m.symbol, m.broadcastLabel, m.logs);
       }
     }, 250);
   })
@@ -211,5 +279,7 @@ async function init(settings, wssInstance, beholderInstance) {
 module.exports = {
   init,
   startChartMonitor,
-  stopChartMonitor
+  stopChartMonitor,
+  startTickerMonitor,
+  stopTickerMonitor
 }
