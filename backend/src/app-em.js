@@ -1,6 +1,6 @@
 const ordersRepository = require('./repositories/ordersRepository');
 const { getActiveMonitors, monitorTypes } = require('./repositories/monitorsRepository');
-const { RSI, MACD, indexKeys } = require('./utils/indexes');
+const { execCalc, indexKeys } = require('./utils/indexes');
 
 let WSS, beholder, exchange;
 
@@ -111,32 +111,25 @@ function startUserDataMonitor(broadcastLabel, logs) {
   console.log(`User Data Monitor has started at ${broadcastLabel}`);
 }
 
-function processChartData(symbol, indexes, interval, ohlc) {
+async function processChartData(symbol, indexes, interval, ohlc) {
   if (typeof indexes === 'string') indexes = indexes.split(',');
-  if (indexes && indexes.length > 0) {
-    indexes.map(index => {
+  if (!indexes || !Array.isArray(indexes) || indexes.length === 0) return false;
 
-      const params = index.split('_');
-      const indexName = params[0];
-      params.splice(0, 1);
+  return Promise.all(indexes.map(async (index) => {
+    const params = index.split('_');
+    const indexName = params[0];
+    params.splice(0, 1);
 
-      let calc;
-
-      switch (indexName) {
-        case indexKeys.RSI: calc = RSI(ohlc.close, ...params); break;
-        case indexKeys.MACD: calc = MACD(ohlc.close, ...params); break;
-        case indexKeys.SMA: calc = SMA(ohlc.close, ...params); break;
-        case indexKeys.EMA: calc = EMA(ohlc.close, ...params); break;
-        case indexKeys.BOLLINGER_BANDS: calc = BOLLINGER_BANDS(ohlc.close, ...params); break;
-        case indexKeys.STOCH_RSI: calc = STOCH_RSI(ohlc.close, ...params); break;
-        default: return;
-      }
-
-      if (logs) console.log(`${index} calculated: ${JSON.stringify(calc)}`);
-
-      return beholder.updateMemory(symbol, index, interval, calc);
-    })
-  }
+    try {
+      const calc = execCalc(indexName, ohlc, ...params);
+      if (logs) console.log(`${index} calculated: ${JSON.stringify(calc.current ? calc.current : calc)}`);
+      return beholder.updateMemory(symbol, index, interval, calc, calc.current !== undefined);
+    } catch (err) {
+      console.error(`Exchange Monitor => Can't calc the index ${index}: `);
+      console.error(err);
+      return false;
+    }
+  }));
 }
 
 function startChartMonitor(symbol, interval, indexes, broadcastLabel, logs) {

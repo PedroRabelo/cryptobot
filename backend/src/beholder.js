@@ -39,7 +39,7 @@ function updateBrainIndex(index, automationId) {
   BRAIN_INDEX[index].push(automationId);
 }
 
-function updateMemory(symbol, index, interval, value) {
+function updateMemory(symbol, index, interval, value, executeAutomations = true) {
 
   if (LOCK_MEMORY) return false;
 
