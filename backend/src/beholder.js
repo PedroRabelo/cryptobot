@@ -1,4 +1,5 @@
 const { getDefaultSettings } = require('./repositories/settingsRepository');
+const { actionsTypes } = require('./repositories/actionsRepository')
 
 const MEMORY = {}
 
@@ -8,6 +9,8 @@ let BRAIN_INDEX = {}
 let LOCK_MEMORY = false;
 
 let LOCK_BRAIN = false;
+
+const INTERVAL = parseInt(process.env.AUTOMATION_INTERVAL || 0);
 
 const LOGS = process.env.BEHOLDER_LOGS === 'true';
 
@@ -39,7 +42,7 @@ function updateBrainIndex(index, automationId) {
   BRAIN_INDEX[index].push(automationId);
 }
 
-function updateMemory(symbol, index, interval, value, executeAutomations = true) {
+async function updateMemory(symbol, index, interval, value, executeAutomations = true) {
 
   if (LOCK_MEMORY) return false;
 
@@ -49,17 +52,20 @@ function updateMemory(symbol, index, interval, value, executeAutomations = true)
 
   if (LOGS) console.log(`Beholder memory updated: ${memoryKey} => ${JSON.stringify(value)}`);
 
-  if (!LOCK_BRAIN) return false;
+  if (LOCK_BRAIN) return false;
 
   try {
     const automations = findAutomations(memoryKey)
     if (automations && automations.length > 0 && !LOCK_BRAIN) {
       LOCK_BRAIN = true;
-      let results = automations.map(auto => {
-        return evalDecision(auto);
-      }).flat();
 
-      results = results.filter(r => r);
+      const promises = automations.map(auto => {
+        return evalDecision(auto);
+      });
+
+      let results = await Promise.all(promises);
+
+      results = results.flat().filter(r => r);
 
       if (!results || !results.length)
         return false;
@@ -67,7 +73,9 @@ function updateMemory(symbol, index, interval, value, executeAutomations = true)
         return results;
     }
   } finally {
-    LOCK_BRAIN = false;
+    setTimeout(() => {
+      LOCK_BRAIN = false;
+    }, INTERVAL);
   }
 }
 
@@ -85,8 +93,24 @@ function invertConditions(conditions) {
     .join(' && ');
 }
 
+function doAction(settings, action, automation) {
+  try {
+    switch (action.type) {
+      case actionsTypes.ALERT_EMAIL: return { type: 'success', text: 'Email sent!' };
+      case actionsTypes.ALERT_SMS: return { type: 'success', text: 'SMS sent!' };
+      case actionsTypes.ORDER: return { type: 'success', text: 'Order placed!' };
+    }
+  } catch (err) {
+    if (automation.logs) {
+      console.error(`${automation.name}:${action.type}`);
+      console.error(err);
+    }
+    return { type: 'error', text: `Error at ${automation.name}: ${err.message}` };
+  }
+}
+
 async function evalDecision(automation) {
-  const indexes = automation.indexes.split(',');
+  const indexes = automation.indexes ? automation.indexes.split(',') : [];
   const isChecked = indexes.every(ix => MEMORY[ix] !== null && MEMORY[ix] !== undefined);
 
   if (!isChecked) return false;
@@ -103,7 +127,15 @@ async function evalDecision(automation) {
   }
 
   const settings = await getDefaultSettings();
+  let results = automation.actions.map(action => {
+    return doAction(settings, action, automation);
+  })
 
+  results = await Promise.all(results);
+
+  if (automation.logs) console.log(`Automation ${automation.name} has fired!`);
+
+  return results;
 }
 
 function findAutomations(memoryKey) {
