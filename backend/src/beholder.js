@@ -93,10 +93,16 @@ function invertConditions(conditions) {
     .join(' && ');
 }
 
+async function sendEmail(settings, automation) {
+  await require('./utils/email')(settings, `${automation.name} has fired! ${automation.conditions}`);
+  if (automation.logs) console.log('E-mail sent!');
+  return { type: 'success', text: `E-mail sent from automation ${automation.name}` };
+}
+
 function doAction(settings, action, automation) {
   try {
     switch (action.type) {
-      case actionsTypes.ALERT_EMAIL: return { type: 'success', text: 'Email sent!' };
+      case actionsTypes.ALERT_EMAIL: return sendEmail(settings, automation);
       case actionsTypes.ALERT_SMS: return { type: 'success', text: 'SMS sent!' };
       case actionsTypes.ORDER: return { type: 'success', text: 'Order placed!' };
     }

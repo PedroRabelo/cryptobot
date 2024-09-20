@@ -38,6 +38,9 @@ async function updateSettings(id, newSettings) {
   if (newSettings.email && newSettings.email !== currentSettings.email)
     currentSettings.email = newSettings.email;
 
+  if (newSettings.phone && newSettings.phone !== currentSettings.phone)
+    currentSettings.phone = newSettings.phone;
+
   if (newSettings.password)
     currentSettings.password = bcrypt.hashSync(newSettings.password);
 
@@ -54,6 +57,18 @@ async function updateSettings(id, newSettings) {
 
   if (newSettings.streamUrl && newSettings.streamUrl !== currentSettings.streamUrl)
     currentSettings.streamUrl = newSettings.streamUrl;
+
+  if (newSettings.sendGridKey && newSettings.sendGridKey !== currentSettings.sendGridKey)
+    currentSettings.sendGridKey = newSettings.sendGridKey;
+
+  if (newSettings.twilioSid && newSettings.twilioSid !== currentSettings.twilioSid)
+    currentSettings.twilioSid = newSettings.twilioSid;
+
+  if (newSettings.twilioToken && newSettings.twilioToken !== currentSettings.twilioToken)
+    currentSettings.twilioToken = newSettings.twilioToken;
+
+  if (newSettings.twilioPhone && newSettings.twilioPhone !== currentSettings.twilioPhone)
+    currentSettings.twilioPhone = newSettings.twilioPhone;
 
   await currentSettings.save();
 }
