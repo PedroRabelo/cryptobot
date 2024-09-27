@@ -1,5 +1,6 @@
 const orderModel = require('../models/orderModel');
 const Sequelize = require('sequelize');
+const automationModel = require('../models/automationModel')
 
 const PAGE_SIZE = 10
 
@@ -37,6 +38,8 @@ function getOrders(symbol, page = 1) {
       options.where = { symbol }
   }
 
+  options.include = automationModel;
+
   return orderModel.findAndCountAll(options);
 }
 
@@ -49,7 +52,7 @@ function getOrderById(id) {
 }
 
 function getOrder(orderId, clientOrderId) {
-  return orderModel.findOne({ where: { orderId, clientOrderId } });
+  return orderModel.findOne({ where: { orderId, clientOrderId }, include: automationModel });
 }
 
 async function updateOrderById(id, newOrder) {
@@ -60,6 +63,18 @@ async function updateOrderById(id, newOrder) {
 async function updateOrderByOrderId(orderId, clientOrderId, newOrder) {
   const order = await getOrder(orderId, clientOrderId);
   return updateOrder(order, newOrder);
+}
+
+async function getLastFilledOrders() {
+  const idObjects = await orderModel.findAll({
+    where: { status: 'FILLED' },
+    group: 'symbol',
+    attributes: [Sequelize.fn('max', Sequelize.col('id'))],
+    raw: true
+  })
+  const ids = idObjects.map(o => Object.values(o)).flat();
+
+  return orderModel.findAll({ where: { id: ids } });
 }
 
 async function updateOrder(currentOrder, newOrder) {
@@ -104,5 +119,6 @@ module.exports = {
   getOrder,
   updateOrderById,
   updateOrderByOrderId,
-  getOrders
+  getOrders,
+  getLastFilledOrders
 }

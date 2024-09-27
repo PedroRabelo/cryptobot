@@ -99,11 +99,17 @@ async function sendEmail(settings, automation) {
   return { type: 'success', text: `E-mail sent from automation ${automation.name}` };
 }
 
+async function sendSms(settings, automation) {
+  await require('./utils/sms')(settings, `${automation.name} has fired!`);
+  if (automation.logs(console.log('SMS sent!')));
+  return { type: 'success', text: `SMS sent from automation ${automation.name}!` };
+}
+
 function doAction(settings, action, automation) {
   try {
     switch (action.type) {
       case actionsTypes.ALERT_EMAIL: return sendEmail(settings, automation);
-      case actionsTypes.ALERT_SMS: return { type: 'success', text: 'SMS sent!' };
+      case actionsTypes.ALERT_SMS: return sendSms(settings, automation);
       case actionsTypes.ORDER: return { type: 'success', text: 'Order placed!' };
     }
   } catch (err) {

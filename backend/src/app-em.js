@@ -23,10 +23,16 @@ function startMiniTickerMonitor(broadcastLabel, logs) {
     if (broadcastLabel && WSS)
       WSS.broadcast({ [broadcastLabel]: markets });
 
+    //simulação de book
     const books = Object.entries(markets).map(mkt => {
       const book = { symbol: mkt[0], bestAsk: mkt[1].close, bestBid: mkt[1].close };
+      const currentMemory = beholder.getMemory(mkt[0], indexKeys.BOOK);
 
-      beholder.updateMemory(mkt[0], indexKeys.BOOK, null, book)
+      const newMemory = {};
+      newMemory.previous = currentMemory ? currentMemory.current : book;
+      newMemory.current = book;
+
+      beholder.updateMemory(mkt[0], indexKeys.BOOK, null, newMemory)
         .then(results => {
           if (results)
             results.map(r => WSS.broadcast({ notification: r }));
@@ -35,6 +41,7 @@ function startMiniTickerMonitor(broadcastLabel, logs) {
       return book;
     })
     if (WSS) WSS.broadcast({ book: books });
+    //fim da simulação de book
   });
   console.log(`Mini-Ticker Monitor has started at ${broadcastLabel}`);
 }
@@ -54,6 +61,17 @@ async function loadWallet() {
     }
   });
   return wallet;
+}
+
+function notifyOrderUpdate(order) {
+  let type = '';
+  switch (order.status) {
+    case 'FILLED': type = 'success'; break;
+    case 'REJECTED':
+    case 'EXPIRED': type = 'error'; break;
+    default: type = 'info'; break;
+  }
+  WSS.broadcast({ notification: { type, text: `Order #${order.orderId} was updated as ${order.status}` } });
 }
 
 async function processExecutionData(executionData, broadcastLabel) {
@@ -83,13 +101,16 @@ async function processExecutionData(executionData, broadcastLabel) {
 
   setTimeout(async () => {
     try {
-      const order = await ordersRepository.updateOrderByOrderId(order.orderId, order.clientOrderId, order)
-      if (order) {
-        const results = await beholder.updateMemory(order.symbol, indexKeys.LAST_ORDER, null, order);
+      const updatedOrder = await ordersRepository.updateOrderByOrderId(order.orderId, order.clientOrderId, order)
+      if (updatedOrder) {
+
+        notifyOrderUpdate(order);
+
+        const results = await beholder.updateMemory(order.symbol, indexKeys.LAST_ORDER, null, updatedOrder.get({ plain: true }));
 
         if (results) results.map(r => WSS.broadcast({ notification: r }));
         if (broadcastLabel && WSS)
-          WSS.broadcast({ [broadcastLabel]: order })
+          WSS.broadcast({ [broadcastLabel]: updatedOrder.get({ plain: true }) })
       }
     } catch (error) {
       console.error(error);
