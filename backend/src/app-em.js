@@ -106,11 +106,13 @@ async function processExecutionData(executionData, broadcastLabel) {
 
         notifyOrderUpdate(order);
 
-        const results = await beholder.updateMemory(order.symbol, indexKeys.LAST_ORDER, null, updatedOrder.get({ plain: true }));
+        const orderCopy = getLightOrder(updatedOrder.get({ plain: true }));
+
+        const results = await beholder.updateMemory(order.symbol, indexKeys.LAST_ORDER, null, orderCopy);
 
         if (results) results.map(r => WSS.broadcast({ notification: r }));
         if (broadcastLabel && WSS)
-          WSS.broadcast({ [broadcastLabel]: updatedOrder.get({ plain: true }) })
+          WSS.broadcast({ [broadcastLabel]: orderCopy })
       }
     } catch (error) {
       console.error(error);
@@ -299,7 +301,37 @@ async function init(settings, wssInstance, beholderInstance) {
     }, 250);
   })
 
+  const lastOrders = await ordersRepository.getLastFilledOrders();
+  await Promise.all(lastOrders.map(async (order) => {
+    const orderCopy = getLightOrder(order.get({ plain: true }));
+    await beholder.updateMemory(order.symbol, indexKeys.LAST_ORDER, null, orderCopy, false);
+  }));
+
   console.log('App Exchange Monitor is running');
+}
+
+function getLightOrder(order) {
+  const orderCopy = { ...order };
+  delete orderCopy.id;
+  delete orderCopy.symbol;
+  delete orderCopy.automationId;
+  delete orderCopy.orderId;
+  delete orderCopy.clientOrderId;
+  delete orderCopy.transactTime;
+  delete orderCopy.isMaker;
+  delete orderCopy.commission;
+  delete orderCopy.obs;
+  delete orderCopy.automation;
+  delete orderCopy.createdAt;
+  delete orderCopy.updatedAt;
+
+  orderCopy.limitPrice = orderCopy.limitPrice ? parseFloat(orderCopy.limitPrice) : null;
+  orderCopy.stopPrice = orderCopy.stopPrice ? parseFloat(orderCopy.stopPrice) : null;
+  orderCopy.avgPrice = orderCopy.avgPrice ? parseFloat(orderCopy.avgPrice) : null;
+  orderCopy.net = orderCopy.net ? parseFloat(orderCopy.net) : null;
+  orderCopy.quantity = orderCopy.quantity ? parseFloat(orderCopy.quantity) : null;
+  orderCopy.icebergQty = orderCopy.icebergQty ? parseFloat(orderCopy.icebergQty) : null;
+  return orderCopy;
 }
 
 module.exports = {

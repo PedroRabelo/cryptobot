@@ -113,7 +113,13 @@ async function updateOrder(currentOrder, newOrder) {
   return currentOrder;
 }
 
+const STOP_TYPES = [orderTypes.STOP_LOSS, orderTypes.STOP_LOSS_LIMIT, orderTypes.TAKE_PROFIT, orderTypes.TAKE_PROFIT_LIMIT];
+
+const LIMIT_TYPES = [orderTypes.LIMIT, orderTypes.STOP_LOSS_LIMIT, orderTypes.TAKE_PROFIT_LIMIT];
+
 module.exports = {
+  STOP_TYPES,
+  LIMIT_TYPES,
   insertOrder,
   getOrderById,
   getOrder,

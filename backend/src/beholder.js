@@ -1,5 +1,8 @@
 const { getDefaultSettings } = require('./repositories/settingsRepository');
-const { actionsTypes } = require('./repositories/actionsRepository')
+const { actionsTypes } = require('./repositories/actionsRepository');
+const orderTemplateRepository = require('./repositories/orderTemplatesRepository');
+const { getSymbol } = require('./repositories/symbolsRepository');
+const { STOP_TYPES, LIMIT_TYPES, insertOrder } = require('./repositories/ordersRepository')
 
 const MEMORY = {}
 
@@ -34,7 +37,7 @@ function updateBrain(automation) {
   if (!automation.isActive || !automation.conditions) return;
 
   BRAIN[automation.id] = automation;
-  automation.index.split(',').map(ix => updateBrainIndex(ix, automation.id));
+  automation.indexes.split(',').map(ix => updateBrainIndex(ix, automation.id));
 }
 
 function updateBrainIndex(index, automationId) {
@@ -42,55 +45,71 @@ function updateBrainIndex(index, automationId) {
   BRAIN_INDEX[index].push(automationId);
 }
 
+function parseMemoryKey(symbol, index, interval = null) {
+  const indexKey = interval ? `${index}_${interval}` : index;
+  return `${symbol}:${indexKey}`;
+}
+
 async function updateMemory(symbol, index, interval, value, executeAutomations = true) {
+
+  if (value === undefined || value === null) return false;
+  if (value.toJSON) value = value.toJSON();
+  if (value.get) value = value.get({ plain: true });
 
   if (LOCK_MEMORY) return false;
 
-  const indexKey = interval ? `${index}_${interval}` : index;
-  const memoryKey = `${symbol}:${indexKey}`;
+  const memoryKey = parseMemoryKey(symbol, index, interval);
   MEMORY[memoryKey] = value;
 
   if (LOGS) console.log(`Beholder memory updated: ${memoryKey} => ${JSON.stringify(value)}`);
 
-  if (LOCK_BRAIN) return false;
+  if (LOCK_BRAIN) {
+    if (LOGS) console.log(`Beholder brain is locked, sorry`);
+    return false;
+  }
+
+  if (!executeAutomations) return false;
+
+  const automations = findAutomations(memoryKey);
+  if (!automations || !automations.length && LOCK_BRAIN) return false;
+
+  LOCK_BRAIN = true;
+  let results;
 
   try {
-    const automations = findAutomations(memoryKey)
-    if (automations && automations.length > 0 && !LOCK_BRAIN) {
-      LOCK_BRAIN = true;
+    const promises = automations.map(async (auto) => {
+      return evalDecision(memoryKey, auto);
+    });
 
-      const promises = automations.map(auto => {
-        return evalDecision(auto);
-      });
+    results = await Promise.all(promises);
+    results = results.flat().filter(r => r);
 
-      let results = await Promise.all(promises);
-
-      results = results.flat().filter(r => r);
-
-      if (!results || !results.length)
-        return false;
-      else
-        return results;
-    }
+    if (!results || !results.length)
+      return false;
+    else
+      return results;
   } finally {
-    setTimeout(() => {
+    if (results && results.length) {
+      setTimeout(() => {
+        LOCK_BRAIN = false;
+      }, INTERVAL);
+    } else
       LOCK_BRAIN = false;
-    }, INTERVAL);
   }
 }
 
-function invertConditions(conditions) {
+function invertCondition(memoryKey, conditions) {
   const conds = conditions.split(' && ');
-  return conds.map(c => {
-    if (c.indexOf('current') !== -1) {
-      if (c.indexOf('>') !== -1) return c.replace('>', '<').replace('current', 'previous');
-      if (c.indexOf('<') !== -1) return c.replace('<', '>').replace('current', 'previous');
-      if (c.indexOf('!') !== -1) return c.replace('!', '').replace('current', 'previous');
-      if (c.indexOf('==') !== -1) return c.replace('==', '!==').replace('current', 'previous');
-    }
-  })
-    .filter(c => c)
-    .join(' && ');
+  const condToInvert = conds.find(c => c.indexOf(memoryKey) !== -1 && c.indexOf('current') !== -1);
+  if (!condToInvert) return false;
+
+  if (condToInvert.indexOf('>=') != -1) return condToInvert.replace('>=', '<').replace(/current/g, 'previous');
+  if (condToInvert.indexOf('<=') != -1) return condToInvert.replace('<=', '>').replace(/current/g, 'previous');
+  if (condToInvert.indexOf('>') != -1) return condToInvert.replace('>', '<').replace(/current/g, 'previous');
+  if (condToInvert.indexOf('<') != -1) return condToInvert.replace('<', '>').replace(/current/g, 'previous');
+  if (condToInvert.indexOf('!') != -1) return condToInvert.replace('!', '=').replace(/current/g, 'previous');
+  if (condToInvert.indexOf('==') != -1) return condToInvert.replace('==', '!==').replace(/current/g, 'previous');
+  return false;
 }
 
 async function sendEmail(settings, automation) {
@@ -105,12 +124,179 @@ async function sendSms(settings, automation) {
   return { type: 'success', text: `SMS sent from automation ${automation.name}!` };
 }
 
+function calcPrice(orderTemplate, symbol, isStopPrice) {
+  const tickSize = parseFloat(symbol.tickSize);
+  let newPrice, factor;
+
+  if (LIMIT_TYPES.includes(orderTemplate.type)) {
+    try {
+      if (!stopPrice) {
+        if (parseFloat(orderTemplate.limitPrice)) return orderTemplate.limitPrice;
+        newPrice = eval(getEval(orderTemplate.limitPrice)) * orderTemplate.limitPriceMultiplier;
+      } else {
+        if (parseFloat(orderTemplate.stopPrice)) return orderTemplate.stopPrice;
+        newPrice = eval(getEval(orderTemplate.stopPrice)) * orderTemplate.stopPriceMultiplier;
+      }
+    } catch (error) {
+      if (isStopPrice)
+        throw new Error(`Error trying to calc Stop Price with params; ${orderTemplate.stopPrice} x ${orderTemplate.stopPriceMultiplier}. Error: ${err.message}`);
+      else
+        throw new Error(`Error trying to calc Limite Price with params; ${orderTemplate.limitPrice} x ${orderTemplate.limitPriceMultiplier}. Error: ${err.message}`);
+    }
+  } else {
+    const memory = MEMORY[`${orderTemplate.symbol}:BOOK`];
+    if (!memory)
+      throw new Error(`Error trying to get market price. OTID: ${orderTemplate.id}, ${isStopPrice}. No book`);
+
+    newPrice = orderTemplate.side === 'BUY' ? memory.current.bestAsk : memory.current.bestBid;
+    newPrice = isStopPrice ? newPrice * orderTemplate.stopPriceMultiplier : newPrice * orderTemplate.limitPriceMultiplier;
+  }
+
+  factor = Math.floor(newPrice / tickSize);
+  return (factor * tickSize).toFixed(symbol.quotePrecision);
+}
+
+function calcQty(orderTemplate, price, symbol, isIceberg) {
+  let asset;
+
+  if (orderTemplate.side === 'BUY') {
+    asset = parseFloat(MEMORY[`${symbol.quote}:WALLET`]);
+    if (!asset) throw new Error(`There is no ${symbol.quote} in you wallet to place a buy.`);
+  } else {
+    asset = parseFloat(MEMORY[`${symbol.base}:WALLET`]);
+    if (!asset) throw new Error(`There is no ${symbol.base} in you wallet to place a sell.`);
+  }
+
+  let qty = isIceberg ? orderTemplate.icebergQty : orderTemplate.quantity;
+  qty = qty.replace(',', '.');
+
+  if (parseFloat(qty)) return qty;
+
+  const multiplier = isIceberg ? orderTemplate.icebergQtyMultiplier : orderTemplate.quantityMultiplier;
+  const stepSize = parseFloat(symbol.stepSize);
+
+  let newQty, factor;
+  if (orderTemplate.quantity === 'MAX_WALLET') {
+    if (orderTemplate.side === 'BUY')
+      newQty = (parseFloat(asset) / parseFloat(price)) * (multiplier > 1 ? 1 : multiplier);
+    else
+      newQty = parseFloat(asset) * (multiplier > 1 ? 1 : multiplier);
+  } else if (orderTemplate.quantity === 'MIN_NOTIONAL') {
+    newQty = (parseFloat(symbol.minNotional) / parseFloat(price)) * (multiplier < 1 ? 1 : multiplier);
+  } else if (orderTemplate.quantity === 'LAST_ORDER_QTY') {
+    const lastOrder = MEMORY[`${orderTemplate.symbol}:LAST_ORDER`];
+    if (!lastOrder)
+      throw new Error(`There is no last order to use as qty reference for ${orderTemplate.symbol}`);
+
+    newQty = parseFloat(lastOrder.quantity) * multiplier;
+    if (orderTemplate.side === 'SELL' && newQty > asset) newQty = asset;
+  }
+
+  factor = Math.floor(newQty / stepSize);
+  return (factor * stepSize).toFixed(symbol.basePrecision);
+}
+
+function hasEnoughAssets(symbol, order, price) {
+  const qty = order.type === 'ICEBERG' ? parseFloat(order.options.icebergQty) : parseFloat(order.quantity);
+  if (order.side === 'BUY') {
+    return parseFloat(MEMORY[`${symbol.quote}:WALLET`]) >= (price * qty);
+  } else {
+    return parseFloat(MEMORY[`${symbol.base}:WALLET`]) >= qty;
+  }
+}
+
+async function placeOrder(settings, automation, action) {
+  if (!settings || !automation || !action)
+    throw new Error(`All parameters are required to place an order`);
+
+  if (!action.orderTemplateId)
+    throw new Error(`There is no order template for ${automation.name}, action ${action.id}`);
+
+  const orderTemplate = await orderTemplateRepository.getOrderTemplate(action.orderTemplateId);
+  const symbol = await getSymbol(orderTemplate.symbol);
+
+  const order = {
+    symbol: orderTemplate.symbol.toUpperCase(),
+    side: orderTemplate.side.toUpperCase(),
+    type: orderTemplate.type.toUpperCase()
+  }
+
+  const price = calcPrice(orderTemplate, symbol, false);
+
+  if (!isFinite(price) || !price)
+    throw new Error(`Error in calcPrice function, params: OTID ${orderTemplate.id}, $: ${price}, stop: false`);
+
+  if (LIMIT_TYPES.includes(order.type))
+    order.limitPrice = price;
+
+  const quantity = calcQty(orderTemplate, price, symbol, false);
+
+  if (!isFinite(quantity) || !quantity)
+    throw new Error(`Error in calcQty function, params: OTID ${orderTemplate.id}, $: ${price}, iceberg: false`);
+
+  order.quantity = quantity;
+
+  if (order.type === 'ICEBERG') {
+    const icebergQty = calcQty(orderTemplate, price, symbol, true);
+
+    if (!isFinite(icebergQty) || !icebergQty)
+      throw new Error(`Error in calcQty function, params: OTID ${orderTemplate.id}, $: ${price}, iceberg: true`);
+
+    order.options = { icebergQty };
+  }
+  else if (STOP_TYPES.includes(order.type)) {
+    const stopPrice = calcPrice(orderTemplate, symbol, true);
+
+    if (!isFinite(stopPrice) || !stopPrice)
+      throw new Error(`Error in calcPrice function, params: OTID ${orderTemplate.id}, $: ${stopPrice}, stop: true`);
+
+    order.options = { stopPrice, type: order.type };
+  }
+
+  if (!hasEnoughAssets(symbol, order, price))
+    throw new Error(`You wanna ${order.side} ${order.quantity} ${order.symbol} but you haven't enough assets`);
+
+  let result;
+  const exchange = require('./utils/exchange')(settings);
+
+  try {
+
+    if (order.side === 'BUY')
+      result = await exchange.buy(order.symbol, order.quantity, order.limitPrice, order.options);
+    else
+      result = await exchange.sell(order.symbol, order.quantity, order.limitPrice, order.options);
+  } catch (error) {
+    console.error(error.body ? error.body : error);
+    console.log(order);
+    return { type: 'error', text: `Order failed!` + error.body ? error.body : error };
+  }
+
+  const savedOrder = await insertOrder({
+    automationId: automation.id,
+    symbol: order.symbol,
+    quantity: order.quantity,
+    type: order.type,
+    side: order.side,
+    limitPrice: LIMIT_TYPES.includes(order.type) ? order.limitPrice : null,
+    stopPrice: STOP_TYPES.includes(order.type) ? order.options.stopPrice : null,
+    icebergQty: order.type === 'ICEBERG' ? order.options.icebergQty : null,
+    orderId: result.orderId,
+    clientOrderId: result.clientOrderId,
+    transactTime: result.transactTime,
+    status: result.status,
+  })
+
+  if (automation.logs) console.log(savedOrder.get({ plain: true }));
+
+  return { type: 'success', text: `Order #${result.orderId} placed with status ${result.status}` }
+}
+
 function doAction(settings, action, automation) {
   try {
     switch (action.type) {
       case actionsTypes.ALERT_EMAIL: return sendEmail(settings, automation);
       case actionsTypes.ALERT_SMS: return sendSms(settings, automation);
-      case actionsTypes.ORDER: return { type: 'success', text: 'Order placed!' };
+      case actionsTypes.ORDER: return placeOrder(settings, automation, action);
     }
   } catch (err) {
     if (automation.logs) {
@@ -121,26 +307,32 @@ function doAction(settings, action, automation) {
   }
 }
 
-async function evalDecision(automation) {
+async function evalDecision(memoryKey, automation) {
   const indexes = automation.indexes ? automation.indexes.split(',') : [];
   const isChecked = indexes.every(ix => MEMORY[ix] !== null && MEMORY[ix] !== undefined);
 
   if (!isChecked) return false;
 
-  const invertedConditions = invertConditions(automation.conditions);
-  const isValid = eval(automation.conditions + (invertedConditions ? ' && ' + invertedConditions : ''));
+  const invertedCondition = invertCondition(memoryKey, automation.conditions);
+  const evalCondition = automation.conditions + (invertedCondition ? `&& ${invertedCondition}` : '');
+
+  if (LOGS) console.log(`Beholder is trying to evaluate a condition ${evalCondition}\n at automation ${automation.name}`);
+
+  const isValid = eval(evalCondition);
   if (!isValid) return false;
 
-  if (LOGS) console.log(`Beholder evaluated a condition at automation: ${automation.name}`);
+  if (LOGS || automation.logs) console.log(`Beholder evaluated a condition at automation: ${automation.name}`);
 
   if (!automation.actions) {
-    if (LOGS) console.log(`No actions defined for automation ${automation.name}`);
+    if (LOGS || automation.logs) console.log(`No actions defined for automation ${automation.name}`);
     return false;
   }
 
   const settings = await getDefaultSettings();
-  let results = automation.actions.map(action => {
-    return doAction(settings, action, automation);
+  let results = automation.actions.map(async (action) => {
+    const result = await doAction(settings, action, automation);
+    if (automation.logs) console.log(`Result for action ${action.type} was ${JSON.stringify(result)}`);
+    return result;
   })
 
   results = await Promise.all(results);
@@ -153,13 +345,14 @@ async function evalDecision(automation) {
 function findAutomations(memoryKey) {
   const ids = BRAIN_INDEX[memoryKey];
   if (!ids) return [];
-  return ids.map(id => BRAIN[id]);
+  return [...new Set(ids)].map(id => BRAIN[id]);
 }
 
 function deleteMemory(symbol, index, interval) {
   try {
     const indexKey = interval ? `${index}_${interval}` : index;
     const memoryKey = `${symbol}:${indexKey}`;
+    if (MEMORY[memoryKey] === undefined) return;
 
     LOCK_MEMORY = true;
     delete MEMORY[memoryKey];
@@ -237,18 +430,21 @@ function getEval(prop) {
 
 function getMemoryIndexes() {
   return Object.entries(flattenObject(MEMORY)).map(prop => {
+    if (prop[0].indexOf('previous') !== -1) return false;
     const propSplit = prop[0].split(':');
     return {
       symbol: propSplit[0],
-      variable: propSplit[1],
+      variable: propSplit[1].replace('.current', ''),
       eval: getEval(prop[0]),
       example: propSplit[1]
     }
-  }).sort((a, b) => {
-    if (a.variable < b.variable) return -1;
-    if (a.variable > b.variable) return 1;
-    return 0;
-  });
+  })
+    .filter(ix => ix)
+    .sort((a, b) => {
+      if (a.variable < b.variable) return -1;
+      if (a.variable > b.variable) return 1;
+      return 0;
+    });
 }
 
 function getBrain() {
@@ -264,5 +460,6 @@ module.exports = {
   updateBrain,
   getBrainIndexes,
   deleteBrain,
-  init
+  init,
+  placeOrder
 }

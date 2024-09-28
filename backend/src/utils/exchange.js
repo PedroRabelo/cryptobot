@@ -6,6 +6,7 @@ module.exports = (settings) => {
   const binance = new Binance({
     APIKEY: settings.accessKey,
     APISECRET: settings.secretKey,
+    recvWindow: 5000,
     family: 0,
     urls: {
       base: settings.apiUrl.endsWith('/') ? settings.apiUrl : settings.apiUrl + '/',

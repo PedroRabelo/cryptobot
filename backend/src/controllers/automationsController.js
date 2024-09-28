@@ -80,6 +80,7 @@ async function insertAutomation(req, res, next) {
 
     actions = newAutomation.actions.map(a => {
       a.automationId = savedAutomation.id;
+      delete a.id;
       return a;
     });
     actions = await actionsRepository.insertActions(actions, transaction);
@@ -109,6 +110,7 @@ async function updateAutomation(req, res, next) {
   if (newAutomation.actions && newAutomation.actions.length > 0) {
     const actions = newAutomation.actions.map(a => {
       a.automationId = id;
+      delete a.id;
       return a;
     });
 
