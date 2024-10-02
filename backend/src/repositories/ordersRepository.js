@@ -23,6 +23,22 @@ const orderTypes = {
   TRAILING_STOP: 'TRAILING_STOP'
 }
 
+function getReportOrders(quoteAsset, startDate, endDate) {
+  startDate = startDate ? startDate : 0;
+  endDate = endDate ? endDate : Date.now();
+  return orderModel.findAll({
+    where: {
+      symbol: { [Sequelize.Op.like]: `%${quoteAsset}` },
+      transactTime: { [Sequelize.Op.between]: [startDate, endDate] },
+      status: 'FILLED',
+      net: { [Sequelize.Op.gt]: 0 }
+    },
+    order: [['transactTime', 'ASC']],
+    include: automationModel,
+    raw: true
+  })
+}
+
 function getOrders(symbol, page = 1) {
   const options = {
     where: {},
@@ -120,6 +136,7 @@ const LIMIT_TYPES = [orderTypes.LIMIT, orderTypes.STOP_LOSS_LIMIT, orderTypes.TA
 module.exports = {
   STOP_TYPES,
   LIMIT_TYPES,
+  getReportOrders,
   insertOrder,
   getOrderById,
   getOrder,
