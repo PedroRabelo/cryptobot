@@ -24,6 +24,11 @@ function getAutomations(page = 1) {
   });
 }
 
+async function automationExists(name) {
+  const count = await automationModel.count({ where: { name } });
+  return count > 0
+}
+
 function insertAutomation(newAutomation, transaction) {
   return automationModel.create(newAutomation, { transaction });
 }
@@ -71,5 +76,6 @@ module.exports = {
   getAutomations,
   insertAutomation,
   deleteAutomation,
-  updateAutomation
+  updateAutomation,
+  automationExists
 }
