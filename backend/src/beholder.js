@@ -1,8 +1,10 @@
 const { getDefaultSettings } = require('./repositories/settingsRepository');
 const { actionsTypes } = require('./repositories/actionsRepository');
-const orderTemplateRepository = require('./repositories/orderTemplatesRepository');
+const orderTemplatesRepository = require('./repositories/orderTemplatesRepository');
 const { getSymbol } = require('./repositories/symbolsRepository');
-const { STOP_TYPES, LIMIT_TYPES, insertOrder } = require('./repositories/ordersRepository')
+const { STOP_TYPES, LIMIT_TYPES, insertOrder } = require('./repositories/ordersRepository');
+const db = require('./db');
+const automationsRepository = require('./repositories/automationsRepository');
 
 const MEMORY = {}
 
@@ -35,6 +37,37 @@ function init(automations) {
 
 function updateBrain(automation) {
   if (!automation.isActive || !automation.conditions) return;
+
+  const actions = automation.actions ? automation.actions.map(a => {
+    a = a.toJSON ? a.toJSON() : a;
+    delete a.createdAt;
+    delete a.updatedAt;
+    //delete a.orderTemplate;
+
+    return a;
+  }) : [];
+
+  const grids = automation.grids ? automation.grids.map(g => {
+    g = g.toJSON ? g.toJSON() : g;
+    delete g.createdAt;
+    delete g.updatedAt;
+    delete g.automationId;
+    if (g.orderTemplate) {
+      delete g.orderTemplate.createdAt;
+      delete g.orderTemplate.updatedAt;
+      delete g.orderTemplate.name;
+    }
+    return g;
+  }) : [];
+
+  if (automation.toJSON)
+    automation = automation.toJSON();
+
+  delete automation.createdAt;
+  delete automation.updatedAt;
+
+  automation.actions = actions;
+  automation.grids = grids;
 
   BRAIN[automation.id] = automation;
   automation.indexes.split(',').map(ix => updateBrainIndex(ix, automation.id));
@@ -212,7 +245,7 @@ async function placeOrder(settings, automation, action) {
   if (!action.orderTemplateId)
     throw new Error(`There is no order template for ${automation.name}, action ${action.id}`);
 
-  const orderTemplate = await orderTemplateRepository.getOrderTemplate(action.orderTemplateId);
+  const orderTemplate = await orderTemplatesRepository.getOrderTemplate(action.orderTemplateId);
   const symbol = await getSymbol(orderTemplate.symbol);
 
   const order = {
@@ -291,12 +324,127 @@ async function placeOrder(settings, automation, action) {
   return { type: 'success', text: `Order #${result.orderId} placed with status ${result.status}` }
 }
 
+async function generateGrids(automation, levels, quantity, transaction) {
+  await gridsRepository.deleteGrids(automation.id, transaction);
+  await orderTemplatesRepository.deleteOrderTemplatesByGridName(automation.name, transaction);
+
+  const symbol = await getSymbol(automation.symbol);
+  const tickSize = parseFloat(symbol.tickSize);
+
+  const conditionSplit = automation.conditions.split(' && ');
+  const lowerLimit = parseFloat(conditionSplit[0].split('>')[1]);
+  const upperLimit = parseFloat(conditionSplit[1].split('<')[1]);
+  levels = parseInt(levels);
+
+  const priceLevel = (upperLimit - lowerLimit) / levels;
+  const grids = [];
+
+  const buyOrderTemplate = await orderTemplatesRepository.insertOrderTemplate({
+    name: automation.name + 'BUY',
+    symbol: automation.symbol,
+    type: 'MARKET',
+    side: 'BUY',
+    limitPrice: null,
+    limitPriceMultiplier: 1,
+    quantity,
+    quantityMultiplier: 1,
+    icebergQty: null,
+    icebergQtyMultiplier: 1
+  }, transaction)
+
+  const sellOrderTemplate = await orderTemplatesRepository.insertOrderTemplate({
+    name: automation.name + 'SELL',
+    symbol: automation.symbol,
+    type: 'MARKET',
+    side: 'SELL',
+    limitPrice: null,
+    limitPriceMultiplier: 1,
+    quantity,
+    quantityMultiplier: 1,
+    icebergQty: null,
+    icebergQtyMultiplier: 1
+  }, transaction)
+
+  const currentPrice = parseFloat(MEMORY[`${automation.symbol}:BOOK`].current.bestAsk);
+  const differences = [];
+
+  for (let i = 1; i <= levels; i++) {
+    const priceFactor = Math.floor((lowerLimit + (priceLevel * i)) / tickSize);
+    const targetPrice = priceFactor * tickSize;
+    const targetPriceStr = targetPrice.toFixed(symbol.quotePrecision);
+    differences.push(Math.abs(currentPrice - targetPrice));
+
+    if (targetPrice < currentPrice) { //se está abaixo da cotação, compra
+      const previousLevel = targetPrice - priceLevel;
+      const previousLevelStr = previousLevel.toFixed(symbol.quotePrecision);
+      grids.push({
+        automationId: automation.id,
+        conditions: `MEMORY['${automation.symbol}:BOOK'].current.bestAsk<${targetPriceStr} && MEMORY['${automation.symbol}:BOOK'].previous.bestAsk>=${targetPriceStr} && MEMORY['${automation.symbol}:BOOK'].current.bestAsk>${previousLevelStr}`,
+        orderTemplateId: buyOrderTemplate.id
+      })
+    } else { //se está acima da cotação, vende
+      const nextLevel = targetPrice + priceLevel;
+      const nextLevelStr = nextLevel.toFixed(symbol.quotePrecision);
+      grids.push({
+        automationId: automation.id,
+        conditions: `MEMORY['${automation.symbol}:BOOK'].current.bestBid>${targetPriceStr} && MEMORY['${automation.symbol}:BOOK'].previous.bestBid<=${targetPriceStr} && MEMORY['${automation.symbol}:BOOK'].current.bestBid<${nextLevelStr}`,
+        orderTemplateId: sellOrderTemplate.id
+      })
+    }
+  }
+
+  const nearestGrid = differences.findIndex(d => d === Math.min(...differences));
+  grids.splice(nearestGrid, 1);
+
+  return gridsRepository.insertGrids(grids, transaction);
+}
+
+async function gridEval(settings, automation) {
+  automation.grids = automation.grids.sort((a, b) => a.id - b.id);
+
+  if (LOGS)
+    console.log(`Beholder is in the GRID zone at ${automation.name}`);
+
+  for (let i = 0; i < automation.grids.length; i++) {
+    const grid = automation.grids[i];
+    if (!eval(grid.conditions)) continue;
+
+    if (automation.logs)
+      console.log(`Beholder evaluated a condition at ${automation.name} => ${grid.conditions}`);
+
+    automation.actions[0].orderTemplateId = grid.orderTemplateId;
+
+    const book = MEMORY[`${automation.symbol}:BOOK`];
+    if (!book) return { type: 'error', text: `No book info for ${automation.symbol}` };
+
+    const result = await placeOrder(settings, automation, automation.actions[0]);
+    if (result.type === 'error') return result;
+
+    const transaction = await db.transaction();
+    try {
+      const orderTemplate = await orderTemplatesRepository.getOrderTemplate(grid.orderTemplateId);
+      await generateGrids(automation, automation.grids.length + 1, orderTemplate.quantity, transaction);
+      await transaction.commit();
+    } catch {
+      await transaction.rollback();
+      console.error(err)
+      return { type: 'error', text: `Beholder can't generate grids for ${automation.name}. ERR: ${err.message}` }
+    }
+
+    automation = await automationsRepository.getAutomation(automation.id);
+    updateBrain(automation);
+
+    return result;
+  }
+}
+
 function doAction(settings, action, automation) {
   try {
     switch (action.type) {
       case actionsTypes.ALERT_EMAIL: return sendEmail(settings, automation);
       case actionsTypes.ALERT_SMS: return sendSms(settings, automation);
       case actionsTypes.ORDER: return placeOrder(settings, automation, action);
+      case actionsTypes.GRID: return gridEval(settings, automation);
     }
   } catch (err) {
     if (automation.logs) {
@@ -308,38 +456,46 @@ function doAction(settings, action, automation) {
 }
 
 async function evalDecision(memoryKey, automation) {
-  const indexes = automation.indexes ? automation.indexes.split(',') : [];
-  const isChecked = indexes.every(ix => MEMORY[ix] !== null && MEMORY[ix] !== undefined);
+  if (!automation) return false;
 
-  if (!isChecked) return false;
+  try {
+    const indexes = automation.indexes ? automation.indexes.split(',') : [];
+    const isChecked = indexes.every(ix => MEMORY[ix] !== null && MEMORY[ix] !== undefined);
 
-  const invertedCondition = invertCondition(memoryKey, automation.conditions);
-  const evalCondition = automation.conditions + (invertedCondition ? `&& ${invertedCondition}` : '');
+    if (!isChecked) return false;
 
-  if (LOGS) console.log(`Beholder is trying to evaluate a condition ${evalCondition}\n at automation ${automation.name}`);
+    const invertedCondition = automation.actions[0].type === 'GRID' ? '' : invertCondition(memoryKey, automation.conditions);
+    const evalCondition = automation.conditions + (invertedCondition ? `&& ${invertedCondition}` : '');
 
-  const isValid = eval(evalCondition);
-  if (!isValid) return false;
+    if (LOGS) console.log(`Beholder is trying to evaluate a condition ${evalCondition}\n at automation ${automation.name}`);
 
-  if (LOGS || automation.logs) console.log(`Beholder evaluated a condition at automation: ${automation.name}`);
+    const isValid = eval(evalCondition);
+    if (!isValid) return false;
 
-  if (!automation.actions) {
-    if (LOGS || automation.logs) console.log(`No actions defined for automation ${automation.name}`);
-    return false;
+    if (!automation.actions) {
+      if (LOGS || automation.logs) console.log(`No actions defined for automation ${automation.name}`);
+      return false;
+    }
+
+    if (LOGS || automation.logs) console.log(`Beholder evaluated a condition at automation: ${automation.name}`);
+
+    const settings = await getDefaultSettings();
+    let results = automation.actions.map(async (action) => {
+      const result = await doAction(settings, action, automation);
+      if (automation.logs) console.log(`Result for action ${action.type} was ${JSON.stringify(result)}`);
+      return result;
+    })
+
+    results = await Promise.all(results);
+
+    if (automation.logs && results && results.length && results[0])
+      console.log(`Automation ${automation.name} has fired!`);
+
+    return results;
+  } catch (err) {
+    if (automation.logs) console.error(err);
+    return { type: 'error', text: `Error at evalDecision for '${automation.name}': ${err.message}` }
   }
-
-  const settings = await getDefaultSettings();
-  let results = automation.actions.map(async (action) => {
-    const result = await doAction(settings, action, automation);
-    if (automation.logs) console.log(`Result for action ${action.type} was ${JSON.stringify(result)}`);
-    return result;
-  })
-
-  results = await Promise.all(results);
-
-  if (automation.logs) console.log(`Automation ${automation.name} has fired!`);
-
-  return results;
 }
 
 function findAutomations(memoryKey) {
@@ -492,5 +648,6 @@ module.exports = {
   deleteBrain,
   init,
   placeOrder,
-  tryUSDConversion
+  tryUSDConversion,
+  generateGrids
 }
