@@ -26,6 +26,7 @@ const AutomationModel = database.define('automation', {
     type: Sequelize.STRING,
     allowNull: false
   },
+  schedule: Sequelize.STRING,
   isActive: {
     type: Sequelize.BOOLEAN,
     allowNull: false,

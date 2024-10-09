@@ -27,7 +27,11 @@ function init(automations) {
     BRAIN = {};
     BRAIN_INDEX = {};
 
-    automations.map(auto => updateBrain(auto));
+    automations.map(auto => {
+      if (auto.isActive && !auto.schedule)
+        updateBrain(auto)
+    });
+
   } finally {
     LOCK_BRAIN = false;
     LOCK_MEMORY = false;
@@ -326,7 +330,6 @@ async function placeOrder(settings, automation, action) {
 
 async function generateGrids(automation, levels, quantity, transaction) {
   await gridsRepository.deleteGrids(automation.id, transaction);
-  await orderTemplatesRepository.deleteOrderTemplatesByGridName(automation.name, transaction);
 
   const symbol = await getSymbol(automation.symbol);
   const tickSize = parseFloat(symbol.tickSize);
@@ -339,31 +342,50 @@ async function generateGrids(automation, levels, quantity, transaction) {
   const priceLevel = (upperLimit - lowerLimit) / levels;
   const grids = [];
 
-  const buyOrderTemplate = await orderTemplatesRepository.insertOrderTemplate({
-    name: automation.name + 'BUY',
-    symbol: automation.symbol,
-    type: 'MARKET',
-    side: 'BUY',
-    limitPrice: null,
-    limitPriceMultiplier: 1,
-    quantity,
-    quantityMultiplier: 1,
-    icebergQty: null,
-    icebergQtyMultiplier: 1
-  }, transaction)
+  let buyOrderTemplate, sellOrderTemplate;
+  const orderTemplates = await orderTemplatesRepository.getOrderTemplatesByGridName(automation.name);
 
-  const sellOrderTemplate = await orderTemplatesRepository.insertOrderTemplate({
-    name: automation.name + 'SELL',
-    symbol: automation.symbol,
-    type: 'MARKET',
-    side: 'SELL',
-    limitPrice: null,
-    limitPriceMultiplier: 1,
-    quantity,
-    quantityMultiplier: 1,
-    icebergQty: null,
-    icebergQtyMultiplier: 1
-  }, transaction)
+  if (orderTemplates && orderTemplates.length) {
+    buyOrderTemplate = orderTemplates.find(ot => ot.side === 'BUY');
+    if (buyOrderTemplate && buyOrderTemplate.quantity !== quantity) {
+      buyOrderTemplate.quantity = quantity;
+      await orderTemplatesRepository.updateOrderTemplate(buyOrderTemplate.id, buyOrderTemplate);
+    }
+
+    sellOrderTemplate = orderTemplates.find(ot => ot.side === 'SELL');
+    if (sellOrderTemplate && sellOrderTemplate.quantity !== quantity) {
+      sellOrderTemplate.quantity = quantity;
+      await orderTemplatesRepository.updateOrderTemplate(sellOrderTemplate.id, sellOrderTemplate);
+    }
+  }
+
+  if (!buyOrderTemplate)
+    buyOrderTemplate = await orderTemplatesRepository.insertOrderTemplate({
+      name: automation.name + 'BUY',
+      symbol: automation.symbol,
+      type: 'MARKET',
+      side: 'BUY',
+      limitPrice: null,
+      limitPriceMultiplier: 1,
+      quantity,
+      quantityMultiplier: 1,
+      icebergQty: null,
+      icebergQtyMultiplier: 1
+    }, transaction)
+
+  if (!sellOrderTemplate)
+    sellOrderTemplate = await orderTemplatesRepository.insertOrderTemplate({
+      name: automation.name + 'SELL',
+      symbol: automation.symbol,
+      type: 'MARKET',
+      side: 'SELL',
+      limitPrice: null,
+      limitPriceMultiplier: 1,
+      quantity,
+      quantityMultiplier: 1,
+      icebergQty: null,
+      icebergQtyMultiplier: 1
+    }, transaction)
 
   const currentPrice = parseFloat(MEMORY[`${automation.symbol}:BOOK`].current.bestAsk);
   const differences = [];
@@ -460,38 +482,40 @@ async function evalDecision(memoryKey, automation) {
 
   try {
     const indexes = automation.indexes ? automation.indexes.split(',') : [];
-    const isChecked = indexes.every(ix => MEMORY[ix] !== null && MEMORY[ix] !== undefined);
 
-    if (!isChecked) return false;
+    if (indexes.length) {
+      const isChecked = indexes.every(ix => MEMORY[ix] !== null && MEMORY[ix] !== undefined);
+      if (!isChecked) return false;
 
-    const invertedCondition = automation.actions[0].type === 'GRID' ? '' : invertCondition(memoryKey, automation.conditions);
-    const evalCondition = automation.conditions + (invertedCondition ? `&& ${invertedCondition}` : '');
+      const invertedCondition = automation.actions[0].type === 'GRID' || automation.schedule ? '' : invertCondition(memoryKey, automation.conditions);
+      const evalCondition = automation.conditions + (invertedCondition ? `&& ${invertedCondition}` : '');
 
-    if (LOGS) console.log(`Beholder is trying to evaluate a condition ${evalCondition}\n at automation ${automation.name}`);
+      if (LOGS) console.log(`Beholder is trying to evaluate a condition ${evalCondition}\n at automation ${automation.name}`);
 
-    const isValid = eval(evalCondition);
-    if (!isValid) return false;
+      const isValid = evalCondition ? eval(evalCondition) : true;
+      if (!isValid) return false;
+    }
 
-    if (!automation.actions) {
+    if (!automation.actions || !automation.action.length) {
       if (LOGS || automation.logs) console.log(`No actions defined for automation ${automation.name}`);
       return false;
     }
 
-    if (LOGS || automation.logs) console.log(`Beholder evaluated a condition at automation: ${automation.name}`);
+    if ((LOGS || automation.logs) && automation.actions[0].type !== actionsTypes.GRID)
+      console.log(`Beholder evaluated a condition at automation: ${automation.name}`);
 
     const settings = await getDefaultSettings();
-    let results = automation.actions.map(async (action) => {
-      const result = await doAction(settings, action, automation);
-      if (automation.logs) console.log(`Result for action ${action.type} was ${JSON.stringify(result)}`);
-      return result;
-    })
+    let results = [];
 
-    results = await Promise.all(results);
+    for (let i = 0; i < automation.actions.length; i++) {
+      const action = automation.action[i];
+      results.push(await doAction(settings, action, automation));
+    }
 
     if (automation.logs && results && results.length && results[0])
       console.log(`Automation ${automation.name} has fired!`);
 
-    return results;
+    return results.flat();
   } catch (err) {
     if (automation.logs) console.error(err);
     return { type: 'error', text: `Error at evalDecision for '${automation.name}': ${err.message}` }
@@ -649,5 +673,6 @@ module.exports = {
   init,
   placeOrder,
   tryUSDConversion,
-  generateGrids
+  generateGrids,
+  evalDecision
 }

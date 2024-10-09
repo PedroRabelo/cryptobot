@@ -5,6 +5,7 @@ const appWs = require('./app-ws');
 const settingsRepository = require('./repositories/settingsRepository');
 const automationsRepository = require('./repositories/automationsRepository');
 const beholder = require('./beholder');
+const agenda = require('./agenda');
 
 (async () => {
   console.log('Getting the default settings...');
@@ -14,6 +15,9 @@ const beholder = require('./beholder');
   console.log('Initializing the Beholder Brain...');
   const automations = await automationsRepository.getActiveAutomations();
   beholder.init(automations);
+
+  console.log('Initializing the Beholder Agenda...');
+  agenda.init(automations);
 
   console.log('Starting the Server Apps...');
   const server = app.listen(process.env.PORT, () => {

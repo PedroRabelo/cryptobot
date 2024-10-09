@@ -12,4 +12,6 @@ router.get('/brain', beholderController.getBrain);
 
 router.get('/analysis', beholderController.getAnalysisIndexes);
 
+router.get('/agenda', beholderController.getAgenda);
+
 module.exports = router;

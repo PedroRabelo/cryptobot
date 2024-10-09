@@ -2,8 +2,9 @@ const automationsRepository = require('../repositories/automationsRepository');
 const actionsRepository = require('../repositories/actionsRepository');
 const gridsRepository = require('../repositories/gridsRepository');
 const orderTemplatesRepository = require('../repositories/orderTemplatesRepository');
-const symbolsRepository = require('../repositories/symbolsRepository');
+const ordersRepository = require('../repositories/ordersRepository');
 const beholder = require('../beholder');
+const agenda = require('../agenda');
 const db = require('../db');
 
 function validateConditions(conditions) {
@@ -16,17 +17,16 @@ async function startAutomation(req, res, next) {
   if (automation.isActive) return res.sendStatus(204);
 
   automation.isActive = true;
-  beholder.updateBrain(automation.get({ plain: true }));
 
-  // if (automation.schedule) {
-  //     try {
-  //         agenda.addSchedule(automation.get({ plain: true }));
-  //     } catch (err) {
-  //         return res.status(422).json(err.message);
-  //     }
-  // }
-  // else
-  //     beholder.updateBrain(automation.get({ plain: true }));
+  if (automation.schedule) {
+    try {
+      agenda.addSchedule(automation.get({ plain: true }));
+    } catch (err) {
+      return res.status(422).json(err.message);
+    }
+  }
+  else
+    beholder.updateBrain(automation.get({ plain: true }));
 
   await automation.save();
 
@@ -40,12 +40,13 @@ async function stopAutomation(req, res, next) {
   const automation = await automationsRepository.getAutomation(id);
   if (!automation.isActive) return res.sendStatus(204);
 
-  // if (automation.schedule)
-  //     agenda.cancelSchedule(automation.id);
-  // else
-  //     beholder.deleteBrain(automation.get({ plain: true }));
-
   automation.isActive = false;
+
+  if (automation.schedule)
+    agenda.cancelSchedule(automation.id);
+  else
+    beholder.deleteBrain(automation.get({ plain: true }));
+
   beholder.deleteBrain(automation.get({ plain: true }));
   await automation.save();
 
@@ -70,10 +71,10 @@ async function insertAutomation(req, res, next) {
   const newAutomation = req.body;
   const { quantity, levels } = req.query;
 
-  if (!validateConditions(newAutomation.conditions))
+  if (!validateConditions(newAutomation.conditions) && !newAutomation.schedule)
     return res.status(400).json(`Invalid conditions!`);
 
-  if (!newAutomation.actions || !newAutomation.actions.length)
+  if (!newAutomation.actions || newAutomation.actions.length === 0)
     return res.status(400).json(`Invalid actions!`);
 
   const isGrid = newAutomation.actions[0].type === actionsRepository.actionsTypes.GRID;
@@ -115,7 +116,11 @@ async function insertAutomation(req, res, next) {
     savedAutomation.grids = grids;
 
   if (savedAutomation.isActive) {
-    beholder.updateBrain(savedAutomation);
+    if (savedAutomation.schedule) {
+      agenda.addSchedule(savedAutomation.get({ plain: true }));
+    } else {
+      beholder.updateBrain(savedAutomation);
+    }
   }
 
   res.status(201).json(savedAutomation);
@@ -127,7 +132,7 @@ async function updateAutomation(req, res, next) {
 
   const { quantity, levels } = req.query;
 
-  if (!validateConditions(newAutomation.conditions))
+  if (!validateConditions(newAutomation.conditions) && !newAutomation.schedule)
     return res.status(400).json(`Invalid conditions!`);
 
   if (!newAutomation.actions || !newAutomation.actions.length)
@@ -144,7 +149,8 @@ async function updateAutomation(req, res, next) {
   });
 
   const transaction = await db.transaction();
-  let grids = [], updatedAutomation;
+  const currentAutomation = await automationsRepository.getAutomation(id);
+  let updatedAutomation;
 
   try {
     updatedAutomation = await automationsRepository.updateAutomation(id, newAutomation);
@@ -165,10 +171,19 @@ async function updateAutomation(req, res, next) {
   updatedAutomation = await automationsRepository.getAutomation(id);
 
   if (updatedAutomation.isActive) {
-    beholder.deleteBrain(updatedAutomation);
-    beholder.updateBrain(updatedAutomation);
+    if (updatedAutomation.schedule) {
+      agenda.cancelSchedule(updatedAutomation.id);
+      agenda.addSchedule(updatedAutomation.get({ plain: true }));
+    } else {
+      beholder.deleteBrain(currentAutomation);
+      beholder.updateBrain(updatedAutomation);
+    }
   } else {
-    beholder.deleteBrain(updatedAutomation);
+    if (updatedAutomation.schedule) {
+      agenda.cancelSchedule(updatedAutomation.id);
+    } else {
+      beholder.deleteBrain(currentAutomation);
+    }
   }
 
   res.json(updatedAutomation);
@@ -177,15 +192,19 @@ async function updateAutomation(req, res, next) {
 async function deleteAutomation(req, res, next) {
   const id = req.params.id;
   const currentAutomation = await automationsRepository.getAutomation(id);
-  if (currentMonitor.isSystemMon) return res.sendStatus(403);
 
-  if (currentMonitor.isActive) {
-    beholder.deleteBrain(currentMonitor.get({ plain: true }));
+  if (currentAutomation.isActive) {
+    if (currentAutomation.schedule)
+      agenda.cancelSchedule(currentAutomation.id);
+    else
+      beholder.deleteBrain(currentAutomation);
   }
 
   const transaction = db.transaction();
 
   try {
+
+    await ordersRepository.removeAutomationFromOrders(id, transaction);
 
     if (currentAutomation.actions[0].type === actionsRepository.actionsTypes.GRID) {
       await gridsRepository.deleteGrids(id, transaction);

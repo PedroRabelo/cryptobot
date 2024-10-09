@@ -1,5 +1,6 @@
 const beholder = require('../beholder');
 const indexes = require('../utils/indexes');
+const agenda = require('../agenda');
 
 function getMemory(req, res, next) {
   const { symbol, index, interval } = req.params;
@@ -23,10 +24,15 @@ function getAnalysisIndexes(req, res, next) {
   res.json(indexes.getAnalysisIndexes());
 }
 
+function getAgenda(req, res, next) {
+  res.json(agenda.getAgenda());
+}
+
 module.exports = {
   getMemory,
   getMemoryIndexes,
   getBrain,
   getBrainIndexes,
-  getAnalysisIndexes
+  getAnalysisIndexes,
+  getAgenda
 }

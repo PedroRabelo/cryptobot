@@ -44,7 +44,8 @@ function getOrders(symbol, page = 1) {
     where: {},
     order: [['updatedAt', 'DESC']],
     limit: PAGE_SIZE,
-    offset: PAGE_SIZE * (page - 1)
+    offset: PAGE_SIZE * (page - 1),
+    distinct: true
   };
 
   if (symbol) {
@@ -91,6 +92,15 @@ async function getLastFilledOrders() {
   const ids = idObjects.map(o => Object.values(o)).flat();
 
   return orderModel.findAll({ where: { id: ids } });
+}
+
+async function removeAutomationFromOrders(automationId, transaction) {
+  return orderModel.update({
+    automationId: null
+  }, {
+    where: { automationId },
+    transaction
+  })
 }
 
 async function updateOrder(currentOrder, newOrder) {
@@ -143,5 +153,6 @@ module.exports = {
   updateOrderById,
   updateOrderByOrderId,
   getOrders,
-  getLastFilledOrders
+  getLastFilledOrders,
+  removeAutomationFromOrders
 }
