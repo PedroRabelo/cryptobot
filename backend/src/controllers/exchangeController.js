@@ -26,6 +26,15 @@ async function getBalance(req, res, next) {
   res.json(info);
 }
 
+async function getCoins(req, res, next) {
+  const id = res.locals.token.id;
+  const settings = await settingsRepository.getSettingsDecrypted(id);
+  const exchange = require('../utils/exchange')(settings);
+  const coins = await exchange.getCoins();
+  res.json(coins);
+}
+
 module.exports = {
   getBalance,
+  getCoins
 }

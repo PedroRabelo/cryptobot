@@ -42,6 +42,9 @@ app.use('/automations', authMiddleware, automationsRouter);
 const orderTemplatesRouter = require('./routers/orderTemplatesRouter');
 app.use('/ordertemplates', authMiddleware, orderTemplatesRouter);
 
+const withdrawTemplatesRouter = require('./routers/withdrawTemplatesRouter');
+app.use('/withdrawtemplates', authMiddleware, withdrawTemplatesRouter);
+
 const beholderRouter = require('./routers/beholderRouter');
 app.use('/beholder', authMiddleware, beholderRouter);
 

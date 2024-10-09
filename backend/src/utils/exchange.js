@@ -1,4 +1,6 @@
 const Binance = require('node-binance-api');
+const LOGS = process.env.BINANCE_LOGS === 'true';
+const SAPI_URL = process.env.BINANCE_SAPI_URL;
 
 module.exports = (settings) => {
   if (!settings) throw new Error('The settings object is required to connect on exchange.');
@@ -47,6 +49,54 @@ module.exports = (settings) => {
   async function orderTrade(symbol, orderId) {
     const trades = await binance.trades(symbol);
     return await trades.find(t => t.orderId === parseInt(orderId));
+  }
+
+  async function getCoins() {
+    try {
+      const coins = await privateCalls(SAPI_URL + 'capital/config/getall', null, 'GET');
+      return coins.map(c => {
+        return {
+          coin: c.coin,
+          networks: c.networkList.map(n => {
+            return {
+              network: n.network,
+              withdrawIntegerMultiple: n.withdrawIntegerMultiple,
+              isDefault: n.isDefault,
+              name: n.name,
+              withdrawFee: n.withdrawFee,
+              withdrawMin: n.withdrawMin,
+              minConfirm: n.minConfirm
+            }
+          })
+        }
+      })
+    } catch (err) {
+      throw new Error(err.response ? JSON.stringify(err.response.data) : err.message);
+    }
+  }
+
+  async function privateCalls(apiUrl, data = {}, method = 'GET') {
+    const timestamp = Date.now();
+    const recvWindow = 60000;
+
+    const axios = require('axios');
+    const queryString = new URLSearchParams();
+    Object.entries({ ...data, timestamp, recvWindow }).map(prop => queryString.append(prop[0], `${prop[1]}`));
+
+    const signature = require('crypto')
+      .createHmac('sha256', settings.secretKey)
+      .update(queryString.toString())
+      .digest('hex');
+
+    queryString.append('signature', signature);
+
+    const result = await axios({
+      method,
+      url: `${apiUrl}?${queryString.toString()}`,
+      headers: { 'X-MBX-APIKEY': settings.accessKey }
+    })
+
+    return result.data;
   }
 
   function miniTickerStream(callback) {
@@ -110,6 +160,7 @@ module.exports = (settings) => {
     chartStream,
     terminateChartStream,
     tickerStream,
-    terminateTickerStream
+    terminateTickerStream,
+    getCoins
   }
 }

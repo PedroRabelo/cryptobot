@@ -4,7 +4,8 @@ const actionsTypes = {
   ALERT_EMAIL: 'ALERT_EMAIL',
   ALERT_SMS: 'ALERT_SMS',
   ORDER: 'ORDER',
-  GRID: 'GRID'
+  GRID: 'GRID',
+  WITHDRAW: 'WITHDRAW'
 }
 
 function insertActions(actions, transaction) {
@@ -22,9 +23,14 @@ function getByOrderTemplate(orderTemplateId) {
   return actionModel.findAll({ where: { orderTemplateId } });
 }
 
+function getByWithdrawTemplate(withdrawTemplateId) {
+  return actionModel.findAll({ where: { withdrawTemplateId } });
+}
+
 module.exports = {
   actionsTypes,
   insertActions,
   deleteActions,
-  getByOrderTemplate
+  getByOrderTemplate,
+  getByWithdrawTemplate
 }
