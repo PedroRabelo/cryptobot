@@ -3,7 +3,6 @@ require('express-async-errors');
 
 const cors = require('cors');
 const helmet = require('helmet');
-const morgan = require('morgan');
 
 const authMiddleware = require('./middlewares/authMiddleware');
 const authController = require('./controllers/authController');
@@ -16,7 +15,11 @@ app.use(helmet());
 
 app.use(express.json());
 
-app.use(morgan('dev'));
+if (process.env.NODE_ENV !== 'production') {
+  const morgan = require('morgan');
+  app.use(morgan('dev'));
+}
+
 
 app.post('/login', authController.doLogin);
 app.post('/logout', authController.doLogout);
@@ -47,6 +50,9 @@ app.use('/withdrawtemplates', authMiddleware, withdrawTemplatesRouter);
 
 const beholderRouter = require('./routers/beholderRouter');
 app.use('/beholder', authMiddleware, beholderRouter);
+
+const logsRouter = require('./routers/logsRouter');
+app.use('/logs', authMiddleware, logsRouter);
 
 app.use(require('./middlewares/errorMIddleware'));
 

@@ -70,6 +70,12 @@ async function updateSettings(id, newSettings) {
   if (newSettings.twilioPhone && newSettings.twilioPhone !== currentSettings.twilioPhone)
     currentSettings.twilioPhone = newSettings.twilioPhone;
 
+  if (newSettings.telegramBot && newSettings.telegramBot !== currentSettings.telegramBot)
+    currentSettings.telegramBot = newSettings.telegramBot;
+
+  if (newSettings.telegramChat && newSettings.telegramChat !== currentSettings.telegramChat)
+    currentSettings.telegramChat = newSettings.telegramChat;
+
   await currentSettings.save();
 }
 

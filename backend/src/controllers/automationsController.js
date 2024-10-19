@@ -6,6 +6,7 @@ const ordersRepository = require('../repositories/ordersRepository');
 const beholder = require('../beholder');
 const agenda = require('../agenda');
 const db = require('../db');
+const logger = require('../utils/logger');
 
 function validateConditions(conditions) {
   return /^(MEMORY\[\'.+?\'\](\..+)?[><=!]+([0-9\.\-]+|(\'.+?\')|true|false|MEMORY\[\'.+?\'\](\..+)?)( && )?)+$/ig.test(conditions);
@@ -106,20 +107,17 @@ async function insertAutomation(req, res, next) {
     await transaction.commit();
   } catch (err) {
     await transaction.rollback();
-    console.error(err);
+    logger('system', err);
     return res.status(500).json(err.message);
   }
 
-  savedAutomation.actions = actions;
-
-  if (isGrid)
-    savedAutomation.grids = grids;
+  savedAutomation = await automationsRepository.getAutomation(savedAutomation.id);
 
   if (savedAutomation.isActive) {
     if (savedAutomation.schedule) {
       agenda.addSchedule(savedAutomation.get({ plain: true }));
     } else {
-      beholder.updateBrain(savedAutomation);
+      beholder.updateBrain(savedAutomation.get({ plain: true }));
     }
   }
 
@@ -165,6 +163,7 @@ async function updateAutomation(req, res, next) {
     await transaction.commit();
   } catch (err) {
     await transaction.rollback();
+    logger('system', err);
     return res.status(500).json(err.message);
   }
 
@@ -176,7 +175,7 @@ async function updateAutomation(req, res, next) {
       agenda.addSchedule(updatedAutomation.get({ plain: true }));
     } else {
       beholder.deleteBrain(currentAutomation);
-      beholder.updateBrain(updatedAutomation);
+      beholder.updateBrain(updatedAutomation.get({ plain: true }));
     }
   } else {
     if (updatedAutomation.schedule) {
@@ -217,6 +216,7 @@ async function deleteAutomation(req, res, next) {
     res.sendStatus(204);
   } catch (err) {
     await transaction.rollback();
+    logger('system', err);
     return res.status(500).json(err.message);
   }
 }

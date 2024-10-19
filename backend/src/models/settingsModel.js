@@ -25,6 +25,8 @@ const settingsModel = database.define('settings', {
   twilioSid: Sequelize.STRING,
   twilioToken: Sequelize.STRING,
   twilioPhone: Sequelize.STRING,
+  telegramBot: Sequelize.STRING,
+  telegramChat: Sequelize.STRING,
   createdAt: Sequelize.DATE,
   updatedAt: Sequelize.DATE
 }, {

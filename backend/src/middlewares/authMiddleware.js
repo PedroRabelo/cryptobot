@@ -1,5 +1,6 @@
 const { isBlacklisted } = require('../controllers/authController');
 const jwt = require('jsonwebtoken');
+const logger = require('../utils/logger');
 
 module.exports = (req, res, next) => {
   if (!process.env.JWT_SECRET) return res.status(500).json('No JWT Secret.');
@@ -15,7 +16,7 @@ module.exports = (req, res, next) => {
         }
       }
     } catch (error) {
-      console.error(error)
+      logger('system', err);
     }
   }
 

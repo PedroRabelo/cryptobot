@@ -146,6 +146,7 @@ const LIMIT_TYPES = [orderTypes.LIMIT, orderTypes.STOP_LOSS_LIMIT, orderTypes.TA
 module.exports = {
   STOP_TYPES,
   LIMIT_TYPES,
+  orderTypes,
   getReportOrders,
   insertOrder,
   getOrderById,

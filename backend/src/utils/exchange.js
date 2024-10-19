@@ -1,4 +1,6 @@
 const Binance = require('node-binance-api');
+const logger = require('./logger');
+
 const LOGS = process.env.BINANCE_LOGS === 'true';
 const SAPI_URL = process.env.BINANCE_SAPI_URL;
 
@@ -25,17 +27,17 @@ module.exports = (settings) => {
   }
 
   function buy(symbol, quantity, price, options) {
-    if (price)
-      return binance.buy(symbol, quantity, price, options);
+    if (!options.type || options.type === 'MARKET')
+      return binance.marketBuy(symbol, quantity);
 
-    return binance.marketBuy(symbol, quantity);
+    return binance.buy(symbol, quantity, price, options);
   }
 
   function sell(symbol, quantity, price, options) {
-    if (price)
-      return binance.sell(symbol, quantity, price, options);
+    if (!options.type || options.type === 'MARKET')
+      return binance.marketSell(symbol, quantity);
 
-    return binance.marketSell(symbol, quantity);
+    return binance.sell(symbol, quantity, price, options);
   }
 
   function cancel(symbol, orderId) {
@@ -49,6 +51,18 @@ module.exports = (settings) => {
   async function orderTrade(symbol, orderId) {
     const trades = await binance.trades(symbol);
     return await trades.find(t => t.orderId === parseInt(orderId));
+  }
+
+  function withdraw(coin, amount, address, network, addressTag) {
+    try {
+      const data = { coin, amount, address };
+      if (addressTag) data.addressTag = addressTag;
+      if (network) data.network = network;
+
+      return privateCalls(SAPI_URL + 'capital/withdraw/apply', data, 'POST');
+    } catch (err) {
+      throw new Error(err.response ? JSON.stringify(err.response.data) : err.message);
+    }
   }
 
   async function getCoins() {
@@ -111,7 +125,7 @@ module.exports = (settings) => {
     binance.websockets.userData(
       balance => balanceCallback(balance),
       executionData => executionCallback(executionData),
-      subscribedData => console.log(`userDataStream:subscribed: ${subscribedData}`),
+      subscribedData => logger('system', `userDataStream:subscribed: ${subscribedData}`),
       listStatusData => listStatusCallback(listStatusData)
     )
   }
@@ -126,24 +140,24 @@ module.exports = (settings) => {
       const ohlc = binance.ohlc(chart);
       callback(ohlc);
     });
-    if (LOGS) console.log(`Chart Stream connected at ${streamUrl}`);
+    if (LOGS) logger('system', `Chart Stream connected at ${streamUrl}`);
   }
 
   function terminateChartStream(symbol, interval) {
     binance.websockets.terminate(`${symbol.toLowerCase()}@kline_${interval}`);
-    console.log(`Chart Stream ${symbol.toLowerCase()}@kline_${interval} terminated`);
+    logger('system', `Chart Stream ${symbol.toLowerCase()}@kline_${interval} terminated`);
   }
 
   async function tickerStream(symbol, callback) {
     const streamUrl = binance.websockets.prevDay(symbol, (data, converted) => {
       callback(converted)
     })
-    if (LOGS) console.log(`Ticker Stream connected at ${streamUrl}`);
+    if (LOGS) logger('system', `Ticker Stream connected at ${streamUrl}`);
   }
 
   function terminateTickerStream(symbol) {
     binance.websockets.terminate(`${symbol.toLowerCase()}@ticker`);
-    console.log(`Ticker Stream disconnected at ${symbol.toLowerCase()}@ticker`);
+    logger('system', `Ticker Stream disconnected at ${symbol.toLowerCase()}@ticker`);
   }
 
   return {
@@ -161,6 +175,7 @@ module.exports = (settings) => {
     terminateChartStream,
     tickerStream,
     terminateTickerStream,
-    getCoins
+    getCoins,
+    withdraw
   }
 }

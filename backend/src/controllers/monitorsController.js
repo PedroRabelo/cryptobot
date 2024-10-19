@@ -6,11 +6,11 @@ function startStreamMonitor(monitor) {
   switch (monitor.type) {
     case monitorTypes.CANDLES: {
       const indexes = monitor.indexes ? monitor.indexes.split(',') : [];
-      appEm.startChartMonitor(monitor.symbol, monitor.interval, indexes, monitor.broadcastLabel, monitor.logs);
+      appEm.startChartMonitor(monitor.id, monitor.symbol, monitor.interval, indexes, monitor.broadcastLabel, monitor.logs);
       break;
     }
     case monitorTypes.TICKER: {
-      appEm.startTickerMonitor(monitor.symbol, monitor.broadcastLabel, monitor.logs);
+      appEm.startTickerMonitor(monitor.id, monitor.symbol, monitor.broadcastLabel, monitor.logs);
       break;
     }
   }
@@ -20,11 +20,11 @@ function stopStreamMonitor(monitor) {
   switch (monitor.type) {
     case monitorTypes.CANDLES: {
       const indexes = monitor.indexes ? monitor.indexes.split(',') : [];
-      appEm.stopChartMonitor(monitor.symbol, monitor.interval, indexes, monitor.broadcastLabel, monitor.logs);
+      appEm.stopChartMonitor(monitor.id, monitor.symbol, monitor.interval, indexes, monitor.broadcastLabel, monitor.logs);
       break;
     }
     case monitorTypes.TICKER: {
-      appEm.stopTickerMonitor(monitor.symbol, monitor.logs);
+      appEm.stopTickerMonitor(monitor.id, monitor.symbol, monitor.logs);
       break;
     }
   }

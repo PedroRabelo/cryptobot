@@ -1,14 +1,15 @@
 const ordersRepository = require('./repositories/ordersRepository');
 const { getActiveMonitors, monitorTypes } = require('./repositories/monitorsRepository');
 const { execCalc, indexKeys } = require('./utils/indexes');
+const logger = require('./utils/logger');
 
 let WSS, beholder, exchange;
 
-function startMiniTickerMonitor(broadcastLabel, logs) {
+function startMiniTickerMonitor(monitorId, broadcastLabel, logs) {
   if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
 
   exchange.miniTickerStream(async (markets) => {
-    if (logs) console.log(markets);
+    if (logs) logger('M:' + monitorId, markets);
 
     Object.entries(markets).map(async (mkt) => {
       delete mkt[1].volume;
@@ -43,7 +44,7 @@ function startMiniTickerMonitor(broadcastLabel, logs) {
     if (WSS) WSS.broadcast({ book: books });
     //fim da simulação de book
   });
-  console.log(`Mini-Ticker Monitor has started at ${broadcastLabel}`);
+  logger('M:' + monitorId, `Mini-Ticker Monitor has started at ${broadcastLabel}`);
 }
 
 async function loadWallet() {
@@ -74,7 +75,7 @@ function notifyOrderUpdate(order) {
   WSS.broadcast({ notification: { type, text: `Order #${order.orderId} was updated as ${order.status}` } });
 }
 
-async function processExecutionData(executionData, broadcastLabel) {
+async function processExecutionData(monitorId, executionData, broadcastLabel) {
 
   if (executionData.x === 'NEW') return;
 
@@ -115,13 +116,13 @@ async function processExecutionData(executionData, broadcastLabel) {
           WSS.broadcast({ [broadcastLabel]: orderCopy })
       }
     } catch (error) {
-      console.error(error);
+      logger('M:' + monitorId, error);
     }
 
   }, 3000)
 }
 
-function startUserDataMonitor(broadcastLabel, logs) {
+function startUserDataMonitor(monitorId, broadcastLabel, logs) {
   if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
 
   const [balanceBroadcast, executionBroadcast] = broadcastLabel ? broadcastLabel.split(',') : [null, null];
@@ -130,21 +131,21 @@ function startUserDataMonitor(broadcastLabel, logs) {
 
   exchange.userDataStream(
     balanceData => {
-      if (logs) console.log(balanceData);
+      if (logs) logger('M:' + monitorId, balanceData);
       const wallet = loadWallet();
       if (balanceBroadcast && WSS)
         WSS.broadcast({ [balanceBroadcast]: wallet })
     },
     executionData => {
-      if (logs) console.log(executionData);
+      if (logs) logger('M:' + monitorId, executionData);
 
-      processExecutionData(executionData, executionBroadcast);
+      processExecutionData(monitorId, executionData, executionBroadcast);
     }
   );
-  console.log(`User Data Monitor has started at ${broadcastLabel}`);
+  logger('M:' + monitorId, `User Data Monitor has started at ${broadcastLabel}`);
 }
 
-async function processChartData(symbol, indexes, interval, ohlc) {
+async function processChartData(monitorId, symbol, indexes, interval, ohlc) {
   if (typeof indexes === 'string') indexes = indexes.split(',');
   if (!indexes || !Array.isArray(indexes) || indexes.length === 0) return false;
 
@@ -155,17 +156,17 @@ async function processChartData(symbol, indexes, interval, ohlc) {
 
     try {
       const calc = execCalc(indexName, ohlc, ...params);
-      if (logs) console.log(`${index} calculated: ${JSON.stringify(calc.current ? calc.current : calc)}`);
+      if (logs) logger('M:' + monitorId, `${index} calculated: ${JSON.stringify(calc.current ? calc.current : calc)}`);
       return await beholder.updateMemory(symbol, index, interval, calc, calc.current !== undefined);
     } catch (err) {
-      console.error(`Exchange Monitor => Can't calc the index ${index}: `);
-      console.error(err);
+      logger('M:' + monitorId, `Exchange Monitor => Can't calc the index ${index}: `);
+      logger('M:' + monitorId, err);
       return false;
     }
   }));
 }
 
-function startChartMonitor(symbol, interval, indexes, broadcastLabel, logs) {
+function startChartMonitor(monitorId, symbol, interval, indexes, broadcastLabel, logs) {
   if (!symbol) return new Error(`You can't start a chart monitor without a symbol`);
   if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
 
@@ -178,27 +179,52 @@ function startChartMonitor(symbol, interval, indexes, broadcastLabel, logs) {
       low: ohlc.low[ohlc.low.length - 1],
     }
 
-    if (logs) console.log(lastCandle);
+    const previousCandle = {
+      open: ohlc.open[ohlc.open.length - 2],
+      close: ohlc.close[ohlc.close.length - 2],
+      high: ohlc.high[ohlc.high.length - 2],
+      low: ohlc.low[ohlc.low.length - 2],
+      volume: ohlc.volume[ohlc.volume.length - 2],
+    };
 
-    let results = await beholder.updateMemory(symbol, indexKeys.LAST_CANDLE, interval, lastCandle);
-    if (results) results.map(r => WSS.broadcast({ notification: r }));
+    const previousPreviousCandle = {
+      open: ohlc.open[ohlc.open.length - 3],
+      close: ohlc.close[ohlc.close.length - 3],
+      high: ohlc.high[ohlc.high.length - 3],
+      low: ohlc.low[ohlc.low.length - 3],
+      volume: ohlc.volume[ohlc.volume.length - 3],
+    };
 
-    if (broadcastLabel && WSS) {
-      WSS.broadcast({ [broadcastLabel]: lastCandle });
+    if (logs) logger('M:' + monitorId, lastCandle);
+
+    try {
+      beholder.updateMemory(symbol, indexKeys.LAST_CANDLE, interval, { current: lastCandle, previous: previousCandle }, false);
+      beholder.updateMemory(symbol, indexKeys.PREVIOUS_CANDLE, interval, { current: previousCandle, previous: previousPreviousCandle }, false);
+
+      if (broadcastLabel && WSS) sendMessage({ [broadcastLabel]: lastCandle });
+
+      let results = await processChartData(monitorId, symbol, indexes, interval, ohlc, logs);
+
+      if (results) {
+        //results.push(await beholder.testAutomations(beholder.parseMemoryKey(symbol, indexKeys.LAST_CANDLE, interval)));
+        //results.push(await beholder.testAutomations(beholder.parseMemoryKey(symbol, indexKeys.PREVIOUS_CANDLE, interval)));
+
+        if (logs) logger('M:' + monitorId, `chartStream Results: ${results}`);
+        results.flat().map(r => sendMessage({ notification: r }));
+      }
+    } catch (err) {
+      if (logs) logger('M:' + monitorId, err);
     }
-
-    results = processChartData(symbol, indexes, interval, ohlc, logs);
-    if (results) results.map(r => WSS.broadcast({ notification: r }));
   });
-  console.log(`Chart Monitor has started at ${symbol}_${interval}`);
+  logger('M:' + monitorId, `Chart Monitor has started at ${symbol}_${interval}`);
 }
 
-function stopChartMonitor(symbol, interval, indexes, logs) {
+function stopChartMonitor(monitorId, symbol, interval, indexes, logs) {
   if (!symbol) return new Error(`You can't stop a chart monitor without a symbol`);
   if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
 
   exchange.terminateChartStream(symbol, interval);
-  if (logs) console.log(`Chart Monitor ${symbol}_${interval} stopped!`);
+  if (logs) logger('M:' + monitorId, `Chart Monitor ${symbol}_${interval} stopped!`);
 
   beholder.deleteMemory(symbol, indexKeys.LAST_CANDLE, interval);
 
@@ -235,12 +261,12 @@ function getLightTicker(data) {
   return data;
 }
 
-function startTickerMonitor(symbol, broadcastLabel, logs) {
+function startTickerMonitor(monitorId, symbol, broadcastLabel, logs) {
   if (!symbol) return new Error(`You can't start a ticker monitor without a symbol`);
   if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
 
   exchange.tickerStream(symbol, async (data) => {
-    if (logs) console.log(data);
+    if (logs) logger('M:' + monitorId, data);
 
     try {
       const ticker = getLightTicker({ ...data });
@@ -254,22 +280,26 @@ function startTickerMonitor(symbol, broadcastLabel, logs) {
 
       if (WSS && broadcastLabel) WSS.broadcastLabel({ [broadcastLabel]: data });
     } catch (err) {
-      if (logs) console.error(err)
+      if (logs) logger('M:' + monitorId, err)
     }
   })
 
-  console.log(`Ticker Monitor has started for ${symbol}`)
+  logger('M:' + monitorId, `Ticker Monitor has started for ${symbol}`)
 }
 
 
-function stopTickerMonitor(symbol, logs) {
+function stopTickerMonitor(monitorId, symbol, logs) {
   if (!symbol) return new Error(`You can't stop a ticker monitor without a symbol`);
   if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
 
   exchange.terminateTickerStream(symbol);
-  if (logs) console.log(`Ticker Monitor ${symbol} stopped!`);
+  if (logs) logger('M:' + monitorId, `Ticker Monitor ${symbol} stopped!`);
 
   beholder.deleteMemory(symbol, indexKeys.TICKER);
+}
+
+function sendMessage(json) {
+  return WSS.broadcast(json);
 }
 
 async function init(settings, wssInstance, beholderInstance) {
@@ -284,19 +314,19 @@ async function init(settings, wssInstance, beholderInstance) {
     setTimeout(() => {
       switch (monitor.type) {
         case monitorTypes.MINI_TICKER:
-          return startMiniTickerMonitor(monitor.broadcastLabel, monitor.logs);
+          return startMiniTickerMonitor(monitor.id, monitor.broadcastLabel, monitor.logs);
         case monitorTypes.BOOK:
           return;
         case monitorTypes.USER_DATA:
-          return startUserDataMonitor(monitor.broadcastLabel, monitor.logs);
+          return startUserDataMonitor(monitor.id, monitor.broadcastLabel, monitor.logs);
         case monitorTypes.CANDLES:
-          return startChartMonitor(monitor.symbol,
+          return startChartMonitor(monitor.id, monitor.symbol,
             monitor.interval,
             monitor.indexes.split(','),
             monitor.broadcastLabel,
             monitor.logs);
         case monitorTypes.TICKER:
-          return startTickerMonitor(m.symbol, m.broadcastLabel, m.logs);
+          return startTickerMonitor(monitor.id, monitor.symbol, monitor.broadcastLabel, monitor.logs);
       }
     }, 250);
   })
@@ -307,7 +337,7 @@ async function init(settings, wssInstance, beholderInstance) {
     await beholder.updateMemory(order.symbol, indexKeys.LAST_ORDER, null, orderCopy, false);
   }));
 
-  console.log('App Exchange Monitor is running');
+  logger('system', 'App Exchange Monitor is running');
 }
 
 function getLightOrder(order) {
@@ -339,5 +369,6 @@ module.exports = {
   startChartMonitor,
   stopChartMonitor,
   startTickerMonitor,
-  stopTickerMonitor
+  stopTickerMonitor,
+  sendMessage
 }

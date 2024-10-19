@@ -23,6 +23,8 @@ async function updateSymbol(req, res, next) {
 
 async function getSymbol(req, res, next) {
   const symbol = req.params.symbol;
+  if (symbol.startsWith('*')) return res.json({ symbol, base: '*', quote: symbol.replace('*', '') });
+
   const symbolData = await symbolsRepository.getSymbol(symbol);
   res.json(symbolData)
 }

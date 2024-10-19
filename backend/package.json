@@ -31,7 +31,9 @@
     "pg": "^8.11.5",
     "sequelize": "^6.37.2",
     "technicalindicators": "^3.1.0",
+    "telegraf": "^4.16.3",
     "twilio": "^5.3.2",
+    "winston": "^3.15.0",
     "ws": "^8.17.0"
   }
 }
