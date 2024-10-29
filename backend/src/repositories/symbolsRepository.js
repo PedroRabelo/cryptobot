@@ -5,6 +5,12 @@ function getSymbols(id) {
   return symbolModel.findAll();
 }
 
+function getManySymbols(symbols) {
+  return symbolModel.findAll({
+    where: { symbol: symbols }
+  })
+}
+
 function searchSymbols(search, onlyFavorites = false, page = 1) {
   const options = {
     where: {},
@@ -73,6 +79,7 @@ function bulkInsert(symbols) {
 
 module.exports = {
   getSymbols,
+  getManySymbols,
   getSymbol,
   updateSymbol,
   deleteAll,

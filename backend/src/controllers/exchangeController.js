@@ -1,30 +1,84 @@
 const settingsRepository = require('../repositories/settingsRepository');
 const withdrawTemplatesRepository = require('../repositories/withdrawTemplatesRepository');
+const ordersRepository = require('../repositories/ordersRepository');
+const symbolsRepository = require('../repositories/symbolsRepository');
 const beholder = require('../beholder');
+
+async function loadBalance(settingsId, fiat) {
+  const settings = await settingsRepository.getSettingsDecrypted(settingsId);
+  const exchange = require('../utils/exchange')(settings);
+  const info = await exchange.balance();
+
+  const coins = Object.entries(info).map(p => p[0]);
+  let total = 0;
+  await Promise.all(coins.map(async (coin) => {
+    let available = parseFloat(info[coin].available);
+    if (available > 0) available = beholder.tryFiatConversion(coin, available, fiat);
+
+    let onOrder = parseFloat(info[coin].onOrder);
+    if (onOrder > 0) onOrder = beholder.tryFiatConversion(coin, onOrder);
+
+    info[coin].fiatEstimate = available + onOrder;
+    total += available + onOrder;
+  }))
+
+  info.fiatEstimate = "~" + fiat + total.toFixed(2);
+  return info;
+}
 
 async function getBalance(req, res, next) {
   const id = res.locals.token.id;
-  const settings = await settingsRepository.getSettingsDecrypted(id);
+  const fiat = req.params.fiat;
 
-  const exchange = require('../utils/exchange')(settings);
+  try {
+    const info = await loadBalance(id, fiat); tem
+    res.json(info);
+  } catch (err) {
+    console.error(err.response ? err.response.data : err);
+    res.status(500).send(err.response ? err.response.data : err.message)
+  }
+}
 
-  const info = await exchange.balance();
+async function getFullBalance(req, res, next) {
+  const id = res.locals.token.id;
+  const fiat = req.params.fiat;
 
-  const usd = Object.entries(info)
-    .map(prop => {
-      let available = parseFloat(prop[1].available);
-      if (available > 0) available = beholder.tryUSDConversion(prop[0], available);
+  try {
+    const info = await loadBalance(id, fiat);
 
-      let onOrder = parseFloat(prop[1].onOrder);
-      if (onOrder > 0) onOrder = beholder.tryUSDConversion(prop[0], onOrder);
+    const averages = await ordersRepository.getAveragePrices();
+    const symbols = await symbolsRepository.getManySymbols(averages.map(a => a.symbol));
 
-      return available + onOrder;
-    })
-    .reduce((prev, curr) => prev + curr);
+    let symbolsObj = {};
+    for (let i = 0; i < symbols.length; i++) {
+      const symbol = symbols[i];
+      symbolsObj[symbol.symbol] = { base: symbol.base, quote: symbol.quote };
+    }
 
-  info.usdEstimate = usd.toFixed(2);
+    const grouped = {};
+    for (let i = 0; averages.length; i++) {
+      const averageObj = averages[i];
+      const symbol = symbolsObj[averageObj.symbol];
 
-  res.json(info);
+      if (symbol.quote !== fiat) {
+        averageObj.avg = beholder.tryFiatConversion(symbol.quote, parseFloat(averageObj.avg), fiat);
+        averageObj.net = beholder.tryFiatConversion(symbol.quote, parseFloat(averageObj.net), fiat);
+      }
+      averageObj.symbol = symbol.base;
+
+      if (!grouped[symbol.base]) grouped[symbol.base] = { net: 0, qty: 0 };
+      grouped[symbol.base].net += averageObj.net;
+      grouped[symbol.base].qty += averageObj.qty;
+    }
+
+    const coins = [...new Set(averages.map(a => a.symbol))];
+    coins.map(coin => info[coin].avg = grouped[coin].net / grouped[coin].qty);
+
+    res.json(info);
+  } catch (err) {
+    console.error(err.response ? err.response.data : err);
+    res.status(500).send(err.response ? err.response.data : err.message)
+  }
 }
 
 async function getCoins(req, res, next) {
@@ -71,6 +125,7 @@ async function doWithdraw(req, res, next) {
 
 module.exports = {
   getBalance,
+  getFullBalance,
   getCoins,
-  doWithdraw
+  doWithdraw,
 }

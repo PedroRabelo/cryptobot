@@ -767,10 +767,10 @@ function getBrain() {
   return { ...BRAIN };
 }
 
-const STABLE_COINS = ['USD', 'USDT', 'USDC', 'BUSD'];
+const DOLLAR_COINS = ['USD', 'USDT', 'USDC', 'BUSD'];
 
 function getStableConversion(baseAsset, quoteAsset, baseQty) {
-  if (STABLE_COINS.includes(baseAsset)) return baseQty;
+  if (DOLLAR_COINS.includes(baseAsset)) return baseQty;
 
   const book = getMemory(baseAsset + quoteAsset, 'BOOK', null);
   if (book) return parseFloat(baseQty) * book.current.bestBid;
@@ -786,15 +786,31 @@ function getFiatConversion(stableCoin, fiatCoin, fiatQty) {
 }
 
 function tryUSDConversion(baseAsset, baseQty) {
-  if (STABLE_COINS.includes(baseAsset)) return baseQty;
+  if (DOLLAR_COINS.includes(baseAsset)) return baseQty;
   if (FIAT_COINS.includes(baseAsset)) return getFiatConversion('USDT', baseAsset, baseQty);
 
-  for (let i = 0; i < STABLE_COINS.length; i++) {
-    const converted = getStableConversion(baseAsset, STABLE_COINS[i], baseQty);
+  for (let i = 0; i < DOLLAR_COINS.length; i++) {
+    const converted = getStableConversion(baseAsset, DOLLAR_COINS[i], baseQty);
     if (converted > 0) return converted;
   }
 
   return 0;
+}
+
+function tryFiatConversion(baseAsset, baseQty, fiat) {
+  if (fiat) fiat = fiat.toUpperCase();
+  if (FIAT_COINS.includes(baseAsset) && baseAsset === fiat) return baseQty;
+
+  const usd = tryUSDConversion(baseAsset, baseQty);
+  if (fiat === 'USD' || !fiat) return usd;
+
+  let book = getMemory('USDT' + fiat, 'BOOK');
+  if (book) usd * book.current.bestBid;
+
+  book = getMemory(fiat + 'USDT', 'BOOK');
+  if (book) return usd / book.current.bestBid;
+
+  return usd;
 }
 
 function searchMemory() {
@@ -816,8 +832,9 @@ module.exports = {
   deleteBrain,
   init,
   placeOrder,
-  tryUSDConversion,
+  tryFiatConversion,
   generateGrids,
   evalDecision,
-  searchMemory
+  searchMemory,
+  parseMemoryKey
 }

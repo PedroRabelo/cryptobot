@@ -145,25 +145,32 @@ function startUserDataMonitor(monitorId, broadcastLabel, logs) {
   logger('M:' + monitorId, `User Data Monitor has started at ${broadcastLabel}`);
 }
 
-async function processChartData(monitorId, symbol, indexes, interval, ohlc) {
+async function processChartData(monitorId, symbol, indexes, interval, ohlc, logs) {
   if (typeof indexes === 'string') indexes = indexes.split(',');
   if (!indexes || !Array.isArray(indexes) || indexes.length === 0) return false;
 
-  return Promise.all(indexes.map(async (index) => {
+  const memoryKeys = [];
+
+  indexes.map(index => {
     const params = index.split('_');
     const indexName = params[0];
     params.splice(0, 1);
 
     try {
       const calc = execCalc(indexName, ohlc, ...params);
-      if (logs) logger('M:' + monitorId, `${index} calculated: ${JSON.stringify(calc.current ? calc.current : calc)}`);
-      return await beholder.updateMemory(symbol, index, interval, calc, calc.current !== undefined);
+      if (logs) logger('M:' + monitorId, `${index}_${interval} calculated: ${JSON.stringify(calc.current ? calc.current : calc)}`);
+      beholder.updateMemory(symbol, index, interval, calc, false);
+
+      memoryKeys.push(beholder.parseMemoryKey(symbol, index, interval));
     } catch (err) {
-      logger('M:' + monitorId, `Exchange Monitor => Can't calc the index ${index}: `);
+      logger('M:' + monitorId, `Exchange Monitor => Can't calc the index ${index}:`);
       logger('M:' + monitorId, err);
-      return false;
     }
-  }));
+  });
+
+  return Promise.all(memoryKeys.map(async (key) => {
+    return beholder.testAutomations(key);
+  }))
 }
 
 function startChartMonitor(monitorId, symbol, interval, indexes, broadcastLabel, logs) {
