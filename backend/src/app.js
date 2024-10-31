@@ -5,6 +5,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const authMiddleware = require('./middlewares/authMiddleware');
+const profileMiddleware = require('./middlewares/profileMiddleware');
 const authController = require('./controllers/authController');
 
 const app = express();
@@ -12,14 +13,17 @@ const app = express();
 const whitelist = (process.env.CORS_ORIGIN || '*').split(',');
 app.use(cors({
   origin: (origin, callback) => {
-    if (whitelist[0] === '*' || whitelist.includes(origin)) {
+    if (!origin) {//for bypassing postman req with  no origin
+      return callback(null, true);
+    }
+    if (whitelist[0] === '*' || whitelist.includes(origin))
       callback(null, true);
-    } else {
-      callback(new Error(`Not allowed by CORS.`));
+    else {
+      console.error(origin + ' not allowed by CORS');
+      callback(new Error(origin + ` not allowed by CORS.`));
     }
   }
 }));
-
 app.use(helmet());
 
 app.use(express.json());

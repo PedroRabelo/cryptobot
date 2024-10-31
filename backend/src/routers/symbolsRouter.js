@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const symbolsController = require('../controllers/symbolsController');
+const profileMiddleware = require('../middlewares/profileMiddleware');
 
-router.get('/', symbolsController.getSymbols);
+router.post('/sync', profileMiddleware, symbolsController.syncSymbols);
 
 router.get('/:symbol', symbolsController.getSymbol);
 
-router.patch('/:symbol', symbolsController.updateSymbol);
+router.patch('/:symbol', profileMiddleware, symbolsController.updateSymbol);
 
-router.post('/sync', symbolsController.syncSymbols);
+router.get('/', symbolsController.getSymbols);
 
 module.exports = router;

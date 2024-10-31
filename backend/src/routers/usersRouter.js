@@ -1,21 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const usersController = require('../controllers/usersController');
+const profileMiddleware = require('../middlewares/profileMiddleware');
 
-router.delete('/:id', usersController.deleteUser);
+router.delete('/:id', profileMiddleware, usersController.deleteUser);
 
 //router.get('/active', usersController.getActiveUsers);
 
-router.get('/:search?', usersController.getUsers);
+router.get('/:search?', profileMiddleware, usersController.getUsers);
 
 router.patch('/:id', usersController.updateUser);
 
-router.post('/', usersController.insertUser);
+router.post('/', profileMiddleware, usersController.insertUser);
 
-router.post('/:id/start', usersController.startUser);
+router.post('/:id/start', profileMiddleware, usersController.startUser);
 
-router.post('/:id/stop', usersController.stopUser);
+router.post('/:id/stop', profileMiddleware, usersController.stopUser);
 
-router.post('/:id/reset', usersController.resetUserPassword);
+router.post('/:id/reset', profileMiddleware, usersController.resetUserPassword);
 
 module.exports = router;

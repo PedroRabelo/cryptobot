@@ -12,6 +12,7 @@ async function doLogin(req, res, next) {
 
   if (origin === process.env.BEHOLDER_URL) {
     entity = await usersRepository.getUserByEmail(email);
+    if (!entity.isActive) return res.sendStatus(401);
   } else if (origin === process.env.HYDRA_URL) {
     entity = await settingsRepository.getSettingsByEmail(email);
   }
