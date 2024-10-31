@@ -1,12 +1,5 @@
 const Sequelize = require('sequelize');
 const database = require('../db');
-const AutomationModel = require('./automationModel');
-const MonitorModel = require('./monitorModel');
-const OrderTemplateModel = require('./orderTemplateModel');
-const WithdrawTemplateModel = require('./withdrawTemplateModel');
-const FavoriteSymbolModel = require('./favoriteSymbolModel');
-const LimitModel = require('./limitModel');
-const WebHookModel = require('./webHookModel');
 
 const userModel = database.define('user', {
   id: {

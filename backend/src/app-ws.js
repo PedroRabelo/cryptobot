@@ -17,8 +17,9 @@ function onConnection(ws, req) {
   logger('system', `app-ws.onConnection`);
 }
 
+const whitelist = (process.env.CORS_ORIGIN || '*').split(',');
 function corsValidation(origin) {
-  return process.env.CORS_ORIGIN.startsWith(origin);
+  return whitelist[0] === '*' || whitelist.includes(origin);
 }
 
 function verifyClient(info, callback) {

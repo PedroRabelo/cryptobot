@@ -9,7 +9,16 @@ const authController = require('./controllers/authController');
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN }));
+const whitelist = (process.env.CORS_ORIGIN || '*').split(',');
+app.use(cors({
+  origin: (origin, callback) => {
+    if (whitelist[0] === '*' || whitelist.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Not allowed by CORS.`));
+    }
+  }
+}));
 
 app.use(helmet());
 
@@ -53,6 +62,9 @@ app.use('/beholder', authMiddleware, beholderRouter);
 
 const logsRouter = require('./routers/logsRouter');
 app.use('/logs', authMiddleware, logsRouter);
+
+const usersRouter = require('./routers/usersRouter');
+app.use('/users', authMiddleware, usersRouter);
 
 app.use(require('./middlewares/errorMIddleware'));
 

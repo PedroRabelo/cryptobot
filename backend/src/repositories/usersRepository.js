@@ -4,11 +4,6 @@ const MonitorModel = require('../models/monitorModel');
 const bcrypt = require('bcryptjs');
 const crypto = require('../utils/crypto');
 const Sequelize = require('sequelize');
-const LimitModel = require('../models/limitModel');
-const ActionModel = require('../models/actionModel');
-const OrderTemplateModel = require('../models/orderTemplateModel');
-const GridModel = require('../models/gridModel');
-const limitModel = require('../models/limitModel');
 
 async function getUserDecrypted(id, eagerLoading = false) {
   const user = await getUser(id, eagerLoading);
@@ -97,7 +92,6 @@ function getUsers(search, page = 1, pageSize = 10) {
     order: [['isActive', 'DESC'], ['name', 'ASC'], ['email', 'ASC']],
     limit: pageSize,
     offset: pageSize * (page - 1),
-    include: LimitModel
   }
 
   if (search) {
