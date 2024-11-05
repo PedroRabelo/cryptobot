@@ -8,6 +8,10 @@ const MonitorModel = database.define('monitor', {
     allowNull: false,
     primaryKey: true
   },
+  userId: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
   symbol: {
     type: Sequelize.STRING,
     allowNull: false,
@@ -40,9 +44,9 @@ const MonitorModel = database.define('monitor', {
 }, {
   indexes: [{
     unique: true,
-    fields: ['type', 'symbol', 'interval']
+    fields: ['type', 'symbol', 'interval', 'userId']
   }, {
-    fields: ['symbol']
+    fields: ['symbol', 'userId']
   }]
 })
 

@@ -10,6 +10,10 @@ const AutomationModel = database.define('automation', {
     allowNull: false,
     primaryKey: true
   },
+  userId: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
   name: {
     type: Sequelize.STRING,
     allowNull: false
@@ -42,7 +46,7 @@ const AutomationModel = database.define('automation', {
 }, {
   indexes: [{
     unique: true,
-    fields: ['symbol', 'name']
+    fields: ['symbol', 'name', 'userId']
   }]
 })
 

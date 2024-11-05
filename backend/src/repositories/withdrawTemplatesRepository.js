@@ -4,35 +4,36 @@ function insertWithdrawTemplate(newWithdrawTemplate, transaction) {
   return withdrawTemplateModel.create(newWithdrawTemplate, { transaction });
 }
 
-function deleteWithdrawTemplate(id, transaction) {
-  return withdrawTemplateModel.destroy({ where: { id }, transaction });
+function deleteWithdrawTemplate(userId, id, transaction) {
+  return withdrawTemplateModel.destroy({ where: { id, userId }, transaction });
 }
 
 function deleteWithdrawTemplates(ids, transaction) {
   return withdrawTemplateModel.destroy({ where: { id: ids }, transaction });
 }
 
-function getWithdrawTemplate(id) {
-  return withdrawTemplateModel.findOne({ where: { id } });
+function getWithdrawTemplate(userId, id) {
+  return withdrawTemplateModel.findOne({ where: { userId, id } });
 }
 
-function getWithdrawTemplates(coin = '', page = 1) {
+function getWithdrawTemplates(userId, coin = '', page = 1) {
   const options = {
-    where: {},
+    where: { userId },
     order: [['coin', 'ASC'], ['name', 'ASC']],
     limit: 10,
     offset: 10 * (page - 1),
     distinct: true
   }
 
-  if (coin) options.where = { coin };
+  if (coin) options.where = { userId, coin };
 
   return withdrawTemplateModel.findAndCountAll(options);
 }
 
-async function updateWithdrawTemplate(id, newWithdrawTemplate) {
+async function updateWithdrawTemplate(userId, id, newWithdrawTemplate) {
 
-  const currentWithdrawTemplate = await getWithdrawTemplate(id);
+  const currentWithdrawTemplate = await getWithdrawTemplate(userId, id);
+  if (!currentWithdrawTemplate) throw new Error(`There is no withdraw template with this params`)
 
   if (newWithdrawTemplate.name && newWithdrawTemplate.name !== currentWithdrawTemplate.name)
     currentWithdrawTemplate.name = newWithdrawTemplate.name;

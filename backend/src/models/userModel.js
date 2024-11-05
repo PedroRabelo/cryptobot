@@ -1,5 +1,10 @@
 const Sequelize = require('sequelize');
 const database = require('../db');
+const AutomationModel = require('./automationModel');
+const MonitorModel = require('./monitorModel');
+const OrderTemplateModel = require('./orderTemplateModel');
+const WithdrawTemplateModel = require('./withdrawTemplateModel');
+const OrderModel = require('./orderModel');
 
 const userModel = database.define('user', {
   id: {
@@ -38,5 +43,25 @@ const userModel = database.define('user', {
     fields: ['email']
   }]
 })
+
+userModel.hasMany(AutomationModel, {
+  foreignKey: 'userId'
+});
+
+userModel.hasMany(MonitorModel, {
+  foreignKey: 'userId'
+});
+
+userModel.hasMany(OrderTemplateModel, {
+  foreignKey: 'userId'
+});
+
+userModel.hasMany(WithdrawTemplateModel, {
+  foreignKey: 'userId'
+});
+
+userModel.hasMany(OrderModel, {
+  foreignKey: 'userId'
+});
 
 module.exports = userModel

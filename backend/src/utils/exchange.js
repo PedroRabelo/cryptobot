@@ -4,19 +4,22 @@ const logger = require('./logger');
 const LOGS = process.env.BINANCE_LOGS === 'true';
 const SAPI_URL = process.env.BINANCE_SAPI_URL;
 
-module.exports = (settings) => {
+module.exports = (settings, user) => {
   if (!settings) throw new Error('The settings object is required to connect on exchange.');
 
   const binance = new Binance({
-    APIKEY: settings.accessKey,
-    APISECRET: settings.secretKey,
+    APIKEY: user ? user.accessKey : undefined,
+    APISECRET: user ? user.secretKey : undefined,
     recvWindow: 5000,
     family: 0,
     urls: {
       base: settings.apiUrl.endsWith('/') ? settings.apiUrl : settings.apiUrl + '/',
       stream: settings.streamUrl.endsWith('/') ? settings.streamUrl : settings.streamUrl + '/',
     }
-  })
+  });
+
+  binance.APIKEY = user ? user.accessKey : undefined;
+  binance.APISECRET = user ? user.secretKey : undefined;
 
   function balance() {
     return binance.balance();
@@ -89,7 +92,27 @@ module.exports = (settings) => {
     }
   }
 
+  async function publicCalls(apiUrl, data = {}, method = 'GET') {
+
+    if (!binance.APIKEY) throw new Error('The settings object is required to connect on exchange.');
+
+    const axios = require('axios');
+    const queryString = new URLSearchParams();
+    Object.entries(data).map(prop => queryString.append(prop[0], `${prop[1]}`));
+
+    const result = await axios({
+      method,
+      url: `${apiUrl}?${queryString.toString()}`,
+      headers: { 'X-MBX-APIKEY': binance.APIKEY }
+    })
+
+    return result.data;
+  }
+
   async function privateCalls(apiUrl, data = {}, method = 'GET') {
+
+    if (!binance.APIKEY || !binance.APISECRET) throw new Error('The settings object is required to connect on exchange.');
+
     const timestamp = Date.now();
     const recvWindow = 60000;
 
@@ -98,7 +121,7 @@ module.exports = (settings) => {
     Object.entries({ ...data, timestamp, recvWindow }).map(prop => queryString.append(prop[0], `${prop[1]}`));
 
     const signature = require('crypto')
-      .createHmac('sha256', settings.secretKey)
+      .createHmac('sha256', binance.APISECRET)
       .update(queryString.toString())
       .digest('hex');
 
@@ -107,7 +130,7 @@ module.exports = (settings) => {
     const result = await axios({
       method,
       url: `${apiUrl}?${queryString.toString()}`,
-      headers: { 'X-MBX-APIKEY': settings.accessKey }
+      headers: { 'X-MBX-APIKEY': binance.APIKEY }
     })
 
     return result.data;
@@ -125,9 +148,25 @@ module.exports = (settings) => {
     binance.websockets.userData(
       balance => balanceCallback(balance),
       executionData => executionCallback(executionData),
-      subscribedData => logger('system', `userDataStream:subscribed: ${subscribedData}`),
+      subscribedData => {
+        logger('system', `userDataStream:subscribed: ${subscribedData}`)
+        binance.options.listenKey = subscribedData;
+      },
       listStatusData => listStatusCallback(listStatusData)
     )
+  }
+
+  function terminateUserDataStream() {
+    const url = settings.apiUrl.endsWith('/')
+      ? settings.apiUrl + 'v3/userDataStream'
+      : settings.apiUrl + '/v3/userDataStream';
+
+    try {
+      const data = { listenKey: binance.options.listenKey };
+      return publicCalls(url, data, 'DELETE');
+    } catch (err) {
+      throw new Error(err.response ? JSON.stringify(err.response.data) : err.message);
+    }
   }
 
   async function chartStream(symbol, interval, callback) {
@@ -176,6 +215,7 @@ module.exports = (settings) => {
     tickerStream,
     terminateTickerStream,
     getCoins,
-    withdraw
+    withdraw,
+    terminateUserDataStream
   }
 }

@@ -10,6 +10,10 @@ const OrderModel = database.define('orders', {
     allowNull: false,
     primaryKey: true
   },
+  userId: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
   automationId: Sequelize.INTEGER,
   symbol: {
     type: Sequelize.STRING,
@@ -56,9 +60,9 @@ const OrderModel = database.define('orders', {
 }, {
   indexes: [{
     unique: true,
-    fields: ['clientOrderId', 'orderId']
+    fields: ['clientOrderId', 'orderId', 'userId']
   }, {
-    fields: ['symbol']
+    fields: ['symbol', 'userId']
   }]
 })
 

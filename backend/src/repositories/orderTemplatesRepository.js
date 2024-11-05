@@ -5,13 +5,13 @@ function insertOrderTemplate(newOrderTemplate, transaction) {
   return orderTemplateModel.create(newOrderTemplate, { transaction });
 }
 
-function deleteOrderTemplate(id) {
-  return orderTemplateModel.destroy({ where: { id } });
+function deleteOrderTemplate(userId, id) {
+  return orderTemplateModel.destroy({ where: { id, userId } });
 }
 
-function getOrderTemplates(symbol, page = 1) {
+function getOrderTemplates(userId, symbol, page = 1) {
   const options = {
-    where: {},
+    where: { userId },
     order: [['symbol', 'ASC'], ['name', 'ASC']],
     limit: 10,
     offset: 10 * (page - 1),
@@ -20,9 +20,9 @@ function getOrderTemplates(symbol, page = 1) {
 
   if (symbol) {
     if (symbol.length < 6)
-      options.where = { symbol: { [Sequelize.Op.like]: `%${symbol}%` } }
+      options.where = { userId, symbol: { [Sequelize.Op.like]: `%${symbol}%` } }
     else
-      options.where = { symbol }
+      options.where = { userId, symbol }
   }
 
   return orderTemplateModel.findAndCountAll(options);
@@ -40,13 +40,14 @@ function getAllOrderTemplates(symbol) {
   return orderTemplateModel.findAll(options);
 }
 
-async function getOrderTemplate(id) {
-  return orderTemplateModel.findOne({ where: { id } });
+async function getOrderTemplate(userId, id) {
+  return orderTemplateModel.findOne({ where: { id, userId } });
 }
 
-async function updateOrderTemplate(id, newOrderTemplate) {
+async function updateOrderTemplate(userId, id, newOrderTemplate) {
 
-  const currentOrderTemplate = await getOrderTemplate(id);
+  const currentOrderTemplate = await getOrderTemplate(userId, id);
+  if (!currentOrderTemplate) throw new Error(`There is no order template with this params.`);
 
   if (newOrderTemplate.name && newOrderTemplate.name !== currentOrderTemplate.name)
     currentOrderTemplate.name = newOrderTemplate.name;
@@ -79,19 +80,19 @@ async function updateOrderTemplate(id, newOrderTemplate) {
   return currentOrderTemplate;
 }
 
-function deleteOrderTemplatesByGridName(gridName, transaction) {
+function deleteOrderTemplatesByGridName(userId, gridName, transaction) {
   const likeName = gridName.split('#')[0];
   return orderTemplateModel.destroy({
-    where: { name: { [Sequelize.Op.like]: `${likeName}#%` } },
+    where: { userId, name: { [Sequelize.Op.like]: `${likeName}#%` } },
     transaction
   })
 }
 
 
-function getOrderTemplatesByGridName(gridName) {
+function getOrderTemplatesByGridName(userId, gridName) {
   const likeName = gridName.split('#')[0];
   return orderTemplateModel.findAll({
-    where: { name: { [Sequelize.Op.like]: `${likeName}#%` } }
+    where: { userId, name: { [Sequelize.Op.like]: `${likeName}#%` } }
   })
 }
 

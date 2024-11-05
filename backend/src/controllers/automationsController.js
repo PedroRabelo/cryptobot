@@ -13,8 +13,11 @@ function validateConditions(conditions) {
 }
 
 async function startAutomation(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
+
   const automation = await automationsRepository.getAutomation(id);
+  if (automation.userId !== userId) return res.sendStatus(403);
   if (automation.isActive) return res.sendStatus(204);
 
   automation.isActive = true;
@@ -37,8 +40,10 @@ async function startAutomation(req, res, next) {
 }
 
 async function stopAutomation(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
   const automation = await automationsRepository.getAutomation(id);
+  if (automation.userId !== userId) return res.sendStatus(403);
   if (!automation.isActive) return res.sendStatus(204);
 
   automation.isActive = false;
@@ -57,19 +62,26 @@ async function stopAutomation(req, res, next) {
 }
 
 async function getAutomation(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
   const automation = await automationsRepository.getAutomation(id);
+  if (automation.userId !== userId) return res.sendStatus(403);
   res.json(automation);
 }
 
 async function getAutomations(req, res, next) {
+  const userId = res.locals.token.id;
   const page = req.query.page;
-  const result = await automationsRepository.getAutomations(page);
+  const result = await automationsRepository.getAutomations(userId, page);
   res.json(result);
 }
 
 async function insertAutomation(req, res, next) {
+  const userId = res.locals.token.id;
+
   const newAutomation = req.body;
+  newAutomation.userId = userId;
+
   const { quantity, levels } = req.query;
 
   if (!validateConditions(newAutomation.conditions) && !newAutomation.schedule)
@@ -83,7 +95,7 @@ async function insertAutomation(req, res, next) {
     return res.status(400).json(`Invalid grid params.`);
   }
 
-  const alreadyExists = await automationsRepository.automationExists(newAutomation.name);
+  const alreadyExists = await automationsRepository.automationExists(userId, newAutomation.name);
   if (alreadyExists)
     return res.status(409).json(`Already exists an automation with this name`);
 
@@ -125,8 +137,10 @@ async function insertAutomation(req, res, next) {
 }
 
 async function updateAutomation(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
   const newAutomation = req.body;
+  newAutomation.userId = userId;
 
   const { quantity, levels } = req.query;
 
@@ -148,6 +162,8 @@ async function updateAutomation(req, res, next) {
 
   const transaction = await db.transaction();
   const currentAutomation = await automationsRepository.getAutomation(id);
+  if (!currentAutomation) return res.sendStatus(404);
+  if (currentAutomation.userId !== userId) return res.sendStatus(403);
   let updatedAutomation;
 
   try {
@@ -189,8 +205,10 @@ async function updateAutomation(req, res, next) {
 }
 
 async function deleteAutomation(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
   const currentAutomation = await automationsRepository.getAutomation(id);
+  if (currentAutomation.userId !== userId) return res.sendStatus(403);
 
   if (currentAutomation.isActive) {
     if (currentAutomation.schedule)
@@ -207,7 +225,7 @@ async function deleteAutomation(req, res, next) {
 
     if (currentAutomation.actions[0].type === actionsRepository.actionsTypes.GRID) {
       await gridsRepository.deleteGrids(id, transaction);
-      await orderTemplatesRepository.deleteOrderTemplatesByGridName(currentAutomation.name, transaction);
+      await orderTemplatesRepository.deleteOrderTemplatesByGridName(userId, currentAutomation.name, transaction);
     }
 
     await actionsRepository.deleteActions(id, transaction);

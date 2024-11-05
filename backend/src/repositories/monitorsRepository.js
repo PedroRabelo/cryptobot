@@ -8,13 +8,13 @@ const monitorTypes = {
   TICKER: 'TICKER'
 }
 
-async function monitorExists(type, symbol, interval) {
-  const count = await monitorModel.count({ where: { type, symbol, interval } });
+async function monitorExists(userId, type, symbol, interval) {
+  const count = await monitorModel.count({ where: { userId, type, symbol, interval } });
   return count > 0;
 }
 
 async function insertMonitor(newMonitor) {
-  const alreadyExists = await monitorExists(newMonitor.type, newMonitor.symbol, newMonitor.interval);
+  const alreadyExists = await monitorExists(newMonitor.userId, newMonitor.type, newMonitor.symbol, newMonitor.interval);
   if (alreadyExists) throw new Error(`Already exists a monitor with these params`);
 
   return monitorModel.create(newMonitor);
@@ -68,13 +68,27 @@ async function updateMonitor(id, newMonitor) {
   return currentMonitor;
 }
 
-function getActiveMonitors() {
-  return monitorModel.findAll({ where: { isActive: true } });
+function getActiveSystemMonitors() {
+  return monitorModel.findAll({
+    where: {
+      isActive: true,
+      userId: null
+    }
+  });
 }
 
-function getMonitors(page = 1) {
+function getActiveUserMonitors(userId) {
+  return monitorModel.findAll({
+    where: {
+      isActive: true,
+      userId
+    }
+  });
+}
+
+function getMonitors(userId, page = 1) {
   return monitorModel.findAndCountAll({
-    where: {},
+    where: { userId },
     order: [['isActive', 'DESC'], ['isSystemMon', 'DESC'], ['symbol', 'ASC']],
     limit: 10,
     offset: 10 * (page - 1)
@@ -89,5 +103,6 @@ module.exports = {
   getMonitors,
   getMonitor,
   updateMonitor,
-  getActiveMonitors
+  getActiveSystemMonitors,
+  getActiveUserMonitors
 }

@@ -13,9 +13,9 @@ function getAutomation(id) {
   return automationModel.findByPk(id, { include: [{ all: true, nested: true }] });
 }
 
-function getAutomations(page = 1) {
+function getAutomations(userId, page = 1) {
   return automationModel.findAndCountAll({
-    where: {},
+    where: { userId },
     order: [['isActive', 'DESC'], ['symbol', 'ASC'], ['name', 'ASC']],
     limit: 10,
     offset: 10 * (page - 1),
@@ -24,8 +24,8 @@ function getAutomations(page = 1) {
   });
 }
 
-async function automationExists(name) {
-  const count = await automationModel.count({ where: { name } });
+async function automationExists(userId, name) {
+  const count = await automationModel.count({ where: { name, userId } });
   return count > 0
 }
 

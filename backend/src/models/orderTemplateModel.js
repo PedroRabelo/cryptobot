@@ -8,6 +8,10 @@ const OrderTemplateModel = database.define('orderTemplate', {
     allowNull: false,
     primaryKey: true
   },
+  userId: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
   name: {
     type: Sequelize.STRING,
     allowNull: false
@@ -39,7 +43,7 @@ const OrderTemplateModel = database.define('orderTemplate', {
   updatedAt: Sequelize.DATE
 }, {
   indexes: [{
-    fields: ['symbol', 'name'],
+    fields: ['symbol', 'name', 'userId'],
     unique: true
   }]
 })

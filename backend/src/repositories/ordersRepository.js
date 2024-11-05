@@ -45,11 +45,12 @@ async function getAveragePrices() {
   })
 }
 
-function getReportOrders(quoteAsset, startDate, endDate) {
+function getReportOrders(userId, quoteAsset, startDate, endDate) {
   startDate = startDate ? startDate : 0;
   endDate = endDate ? endDate : Date.now();
   return orderModel.findAll({
     where: {
+      userId,
       symbol: { [Sequelize.Op.like]: `%${quoteAsset}` },
       transactTime: { [Sequelize.Op.between]: [startDate, endDate] },
       status: 'FILLED',
@@ -61,9 +62,9 @@ function getReportOrders(quoteAsset, startDate, endDate) {
   })
 }
 
-function getOrders(symbol, page = 1) {
+function getOrders(userId, symbol, page = 1) {
   const options = {
-    where: {},
+    where: { userId },
     order: [['updatedAt', 'DESC']],
     limit: PAGE_SIZE,
     offset: PAGE_SIZE * (page - 1),
@@ -72,9 +73,9 @@ function getOrders(symbol, page = 1) {
 
   if (symbol) {
     if (symbol.length < 6)
-      options.where = { symbol: { [Sequelize.Op.like]: `%${symbol}%` } }
+      options.where = { userId, symbol: { [Sequelize.Op.like]: `%${symbol}%` } }
     else
-      options.where = { symbol }
+      options.where = { userId, symbol }
   }
 
   options.include = automationModel;
@@ -104,9 +105,9 @@ async function updateOrderByOrderId(orderId, clientOrderId, newOrder) {
   return updateOrder(order, newOrder);
 }
 
-async function getLastFilledOrders() {
+async function getLastFilledOrders(userId) {
   const idObjects = await orderModel.findAll({
-    where: { status: 'FILLED' },
+    where: { userId, status: 'FILLED' },
     group: 'symbol',
     attributes: [Sequelize.fn('max', Sequelize.col('id'))],
     raw: true

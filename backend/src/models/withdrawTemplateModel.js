@@ -8,6 +8,10 @@ const WithdrawTemplateModel = database.define('withdrawTemplate', {
     allowNull: false,
     primaryKey: true
   },
+  userId: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
   name: {
     type: Sequelize.STRING,
     allowNull: false
@@ -31,7 +35,7 @@ const WithdrawTemplateModel = database.define('withdrawTemplate', {
   updatedAt: Sequelize.DATE
 }, {
   indexes: [{
-    fields: ['name', 'coin'],
+    fields: ['name', 'coin', 'userId'],
     unique: true
   }]
 })

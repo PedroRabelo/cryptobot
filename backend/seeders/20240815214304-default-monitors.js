@@ -43,18 +43,6 @@ module.exports = {
           createdAt: new Date(),
           updatedAt: new Date()
         },
-        {
-          type: monitorTypes.CANDLES,
-          broadcastLabel: null,
-          symbol: 'BTCUSDT',
-          interval: '1m',
-          isActive: true,
-          isSystemMon: false,
-          indexes: 'RSI_14',
-          logs: false,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
       ]);
     }
   },
