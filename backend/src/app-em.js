@@ -1,14 +1,14 @@
 const ordersRepository = require('./repositories/ordersRepository');
-const { getActiveMonitors, monitorTypes } = require('./repositories/monitorsRepository');
+const { monitorTypes, getActiveSystemMonitors } = require('./repositories/monitorsRepository');
 const { execCalc, indexKeys } = require('./utils/indexes');
 const logger = require('./utils/logger');
 
-let WSS, beholder, exchange;
+let WSS, beholder, anonymousExchange;
 
 function startMiniTickerMonitor(monitorId, broadcastLabel, logs) {
-  if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
+  if (!anonymousExchange) return new Error(`Exchange Monitor not initializer yet.`);
 
-  exchange.miniTickerStream(async (markets) => {
+  anonymousExchange.miniTickerStream(async (markets) => {
     if (logs) logger('M:' + monitorId, markets);
 
     Object.entries(markets).map(async (mkt) => {
@@ -47,12 +47,13 @@ function startMiniTickerMonitor(monitorId, broadcastLabel, logs) {
   logger('M:' + monitorId, `Mini-Ticker Monitor has started at ${broadcastLabel}`);
 }
 
-async function loadWallet() {
+async function loadWallet(settings, user) {
+  const exchange = require('./utils/exchange')(settings, user);
   if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
+
   const info = await exchange.balance();
   const wallet = Object.entries(info).map(async (item) => {
-
-    const results = await beholder.updateMemory(item[0], indexKeys.WALLET, null, parseFloat(item[1].available));
+    const results = await beholder.updateMemory(item[0], `${indexKeys.WALLET}_${userId}`, null, parseFloat(item[1].available));
     if (results) results.map(r => WSS.broadcast({ notification: r }));
 
     return {
@@ -122,17 +123,16 @@ async function processExecutionData(monitorId, executionData, broadcastLabel) {
   }, 3000)
 }
 
-function startUserDataMonitor(monitorId, broadcastLabel, logs) {
-  if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
-
+async function startUserDataMonitor(settings, user, monitorId, broadcastLabel, logs) {
   const [balanceBroadcast, executionBroadcast] = broadcastLabel ? broadcastLabel.split(',') : [null, null];
 
-  loadWallet();
+  await loadWallet(settings, user);
 
+  const exchange = require('./utils/exchange')(settings, user);
   exchange.userDataStream(
-    balanceData => {
+    async balanceData => {
       if (logs) logger('M:' + monitorId, balanceData);
-      const wallet = loadWallet();
+      const wallet = await loadWallet(settings, user);
       if (balanceBroadcast && WSS)
         WSS.broadcast({ [balanceBroadcast]: wallet })
     },
@@ -175,9 +175,9 @@ async function processChartData(monitorId, symbol, indexes, interval, ohlc, logs
 
 function startChartMonitor(monitorId, symbol, interval, indexes, broadcastLabel, logs) {
   if (!symbol) return new Error(`You can't start a chart monitor without a symbol`);
-  if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
+  if (!anonymousExchange) return new Error(`Exchange Monitor not initializer yet.`);
 
-  exchange.chartStream(symbol, interval || '1m', async (ohlc) => {
+  anonymousExchange.chartStream(symbol, interval || '1m', async (ohlc) => {
 
     const lastCandle = {
       open: ohlc.open[ohlc.open.length - 1],
@@ -228,9 +228,9 @@ function startChartMonitor(monitorId, symbol, interval, indexes, broadcastLabel,
 
 function stopChartMonitor(monitorId, symbol, interval, indexes, logs) {
   if (!symbol) return new Error(`You can't stop a chart monitor without a symbol`);
-  if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
+  if (!anonymousExchange) return new Error(`Exchange Monitor not initializer yet.`);
 
-  exchange.terminateChartStream(symbol, interval);
+  anonymousExchange.terminateChartStream(symbol, interval);
   if (logs) logger('M:' + monitorId, `Chart Monitor ${symbol}_${interval} stopped!`);
 
   beholder.deleteMemory(symbol, indexKeys.LAST_CANDLE, interval);
@@ -270,9 +270,9 @@ function getLightTicker(data) {
 
 function startTickerMonitor(monitorId, symbol, broadcastLabel, logs) {
   if (!symbol) return new Error(`You can't start a ticker monitor without a symbol`);
-  if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
+  if (!anonymousExchange) return new Error(`Exchange Monitor not initializer yet.`);
 
-  exchange.tickerStream(symbol, async (data) => {
+  anonymousExchange.tickerStream(symbol, async (data) => {
     if (logs) logger('M:' + monitorId, data);
 
     try {
@@ -297,9 +297,9 @@ function startTickerMonitor(monitorId, symbol, broadcastLabel, logs) {
 
 function stopTickerMonitor(monitorId, symbol, logs) {
   if (!symbol) return new Error(`You can't stop a ticker monitor without a symbol`);
-  if (!exchange) return new Error(`Exchange Monitor not initializer yet.`);
+  if (!anonymousExchange) return new Error(`Exchange Monitor not initializer yet.`);
 
-  exchange.terminateTickerStream(symbol);
+  anonymousExchange.terminateTickerStream(symbol);
   if (logs) logger('M:' + monitorId, `Ticker Monitor ${symbol} stopped!`);
 
   beholder.deleteMemory(symbol, indexKeys.TICKER);
@@ -309,14 +309,16 @@ function sendMessage(json) {
   return WSS.broadcast(json);
 }
 
-async function init(settings, wssInstance, beholderInstance) {
+async function init(settings, users, wssInstance, beholderInstance) {
   if (!settings || !beholderInstance) return new Error('Exchange Monitor not initialized yet.');
 
   WSS = wssInstance;
   beholder = beholderInstance;
-  exchange = require('./utils/exchange')(settings);
+  anonymousExchange = require('./utils/exchange')(settings);
 
-  const monitors = await getActiveMonitors();
+  const monitors = await getActiveSystemMonitors();
+  const user = users[0];
+
   monitors.map(monitor => {
     setTimeout(() => {
       switch (monitor.type) {
@@ -325,7 +327,7 @@ async function init(settings, wssInstance, beholderInstance) {
         case monitorTypes.BOOK:
           return;
         case monitorTypes.USER_DATA:
-          return startUserDataMonitor(monitor.id, monitor.broadcastLabel, monitor.logs);
+          return startUserDataMonitor(settings, user, monitor.id, monitor.broadcastLabel, monitor.logs);
         case monitorTypes.CANDLES:
           return startChartMonitor(monitor.id, monitor.symbol,
             monitor.interval,
@@ -338,10 +340,10 @@ async function init(settings, wssInstance, beholderInstance) {
     }, 250);
   })
 
-  const lastOrders = await ordersRepository.getLastFilledOrders();
+  const lastOrders = await ordersRepository.getLastFilledOrders(user.id);
   await Promise.all(lastOrders.map(async (order) => {
     const orderCopy = getLightOrder(order.get({ plain: true }));
-    await beholder.updateMemory(order.symbol, indexKeys.LAST_ORDER, null, orderCopy, false);
+    await beholder.updateMemory(order.symbol, `${indexKeys.LAST_ORDER}_${user.id}`, null, orderCopy, false);
   }));
 
   logger('system', 'App Exchange Monitor is running');
@@ -377,5 +379,6 @@ module.exports = {
   stopChartMonitor,
   startTickerMonitor,
   stopTickerMonitor,
-  sendMessage
+  sendMessage,
+  loadWallet
 }

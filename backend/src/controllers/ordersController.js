@@ -3,6 +3,7 @@ const settingsRepository = require('../repositories/settingsRepository');
 const orderTemplatesRepository = require('../repositories/orderTemplatesRepository');
 const automationRepository = require('../repositories/automationsRepository');
 const actionsRepository = require('../repositories/actionsRepository');
+const usersRepository = require('../repositories/usersRepository');
 const beholder = require('../beholder');
 const logger = require('../utils/logger');
 const db = require('../db');
@@ -82,6 +83,7 @@ function groupByAutomations(orders) {
 }
 
 async function getDayTradeReport(req, res, next) {
+  const userId = res.locals.token.id;
   const quote = req.params.quote;
 
   let startDate = req.query.startDate ? parseInt(req.query.startDate) : getStartToday();
@@ -90,7 +92,7 @@ async function getDayTradeReport(req, res, next) {
   // permitir apenas 24h
   if ((endDate - startDate) > (1 * 24 * 60 * 60 * 1000)) startDate = getStartToday();
 
-  const orders = await ordersRepository.getReportOrders(quote, startDate, endDate);
+  const orders = await ordersRepository.getReportOrders(userId, quote, startDate, endDate);
   const wallet = beholder.getMemory(quote, 'WALLET');
 
   if (!orders || !orders.length) return res.json({ ...EMPTY_REPORT, quote, startDate, endDate });
@@ -135,6 +137,7 @@ async function getDayTradeReport(req, res, next) {
 }
 
 async function getMonthReport(req, res, next) {
+  const userId = res.locals.token.id;
   const quote = req.params.quote;
 
   let startDate = req.query.startDate ? parseInt(req.query.startDate) : thirtyDaysAgo();
@@ -142,7 +145,7 @@ async function getMonthReport(req, res, next) {
 
   if ((endDate - startDate) > (31 * 24 * 60 * 60 * 1000)) startDate = thirtyDaysAgo();
 
-  const orders = await ordersRepository.getReportOrders(quote, startDate, endDate);
+  const orders = await ordersRepository.getReportOrders(userId, quote, startDate, endDate);
   const wallet = beholder.getMemory(quote, 'WALLET');
 
   if (!orders || !orders.length) return res.json({ ...EMPTY_REPORT, quote, startDate, endDate });
@@ -189,14 +192,16 @@ async function getMonthReport(req, res, next) {
 }
 
 async function getOrders(req, res, next) {
+  const userId = res.locals.token.id;
   const symbol = req.params.symbol && req.params.symbol.toUpperCase();
   const page = parseInt(req.query.page);
-  const orders = await ordersRepository.getOrders(symbol, page || 1);
+  const orders = await ordersRepository.getOrders(userId, symbol, page || 1);
   res.json(orders);
 }
 
 async function getLastFilledOrders(req, res, next) {
-  const orders = await ordersRepository.getLastFilledOrders();
+  const userId = res.locals.token.id;
+  const orders = await ordersRepository.getLastFilledOrders(userId);
   res.json(orders);
 }
 
@@ -282,9 +287,10 @@ async function placeTrailingStop(req, res, next) {
 async function placeOrder(req, res, next) {
   if (req.body.options.type === 'TRAILING_STOP') return placeTrailingStop(req, res, next);
 
-  const id = res.locals.token.id;
-  const settings = await settingsRepository.getSettingsDecrypted(id);
-  const exchange = require('../utils/exchange')(settings);
+  const userId = res.locals.token.id;
+  const user = await usersRepository.getUserDecrypted(userId);
+  const settings = await settingsRepository.getDefaultSettings();
+  const exchange = require('../utils/exchange')(settings.get({ plain: true }), user.get({ plain: true }));
 
   const { side, symbol, quantity, limitPrice, options, automationId } = req.body;
 
@@ -300,6 +306,7 @@ async function placeOrder(req, res, next) {
 
   const order = await ordersRepository.insertOrder({
     automationId,
+    userId,
     symbol,
     quantity,
     type: options ? options.type : 'MARKET',
@@ -317,9 +324,10 @@ async function placeOrder(req, res, next) {
 }
 
 async function cancelOrder(req, res, next) {
-  const id = res.locals.token.id;
-  const settings = await settingsRepository.getSettingsDecrypted(id);
-  const exchange = require('../utils/exchange')(settings);
+  const userId = res.locals.token.id;
+  const user = await usersRepository.getUserDecrypted(userId);
+  const settings = await settingsRepository.getDefaultSettings();
+  const exchange = require('../utils/exchange')(settings, user);
 
   const { symbol, orderId } = req.params;
 
@@ -337,9 +345,10 @@ async function cancelOrder(req, res, next) {
 }
 
 async function syncOrder(req, res, next) {
-  const id = res.locals.token.id;
-  const settings = await settingsRepository.getSettingsDecrypted(id);
-  const exchange = require('../utils/exchange')(settings);
+  const userId = res.locals.token.id;
+  const user = await usersRepository.getUserDecrypted(userId);
+  const settings = await settingsRepository.getDefaultSettings();
+  const exchange = require('../utils/exchange')(settings, user);
 
   const beholderOrderId = req.params.id;
   const order = await ordersRepository.getOrderById(beholderOrderId);

@@ -9,15 +9,18 @@ function validatePrice(price) {
 }
 
 async function getOrderTemplate(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
-  const orderTemplate = await orderTemplatesRepository.getOrderTemplate(id);
+  const orderTemplate = await orderTemplatesRepository.getOrderTemplate(userId, id);
+  if (orderTemplate.userId !== userId) return res.sendStatus(403);
   res.json(orderTemplate);
 }
 
 async function getOrderTemplates(req, res, next) {
+  const userId = res.locals.token.id;
   const symbol = req.params.symbol;
   const page = req.query.page;
-  const result = await orderTemplatesRepository.getOrderTemplates(symbol, page);
+  const result = await orderTemplatesRepository.getOrderTemplates(userId, symbol, page);
   res.json(result);
 }
 
@@ -33,7 +36,9 @@ function calcTrailingStop(orderTemplate) {
 }
 
 async function insertOrderTemplate(req, res, next) {
+  const userId = res.locals.token.id;
   const newOrderTemplate = req.body;
+  newOrderTemplate.userId = userId;
 
   if (newOrderTemplate.type === orderTypes.TRAILING_STOP)
     newOrderTemplate.stopPrice = calcTrailingStop(newOrderTemplate);
@@ -48,24 +53,27 @@ async function insertOrderTemplate(req, res, next) {
 }
 
 async function updateOrderTemplate(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
   const newOrderTemplate = req.body;
+  newOrderTemplate.userId = userId;
   newOrderTemplate.quantity = newOrderTemplate.quantity ? newOrderTemplate.quantity.replace(',', '.') : newOrderTemplate.quantity;
 
   if (newOrderTemplate.type === orderTypes.TRAILING_STOP)
     newOrderTemplate.stopPrice = calcTrailingStop(newOrderTemplate);
 
-  const updatedOrderTemplate = await orderTemplatesRepository.updateOrderTemplate(id, newOrderTemplate);
+  const updatedOrderTemplate = await orderTemplatesRepository.updateOrderTemplate(userId, id, newOrderTemplate);
   res.json(updatedOrderTemplate);
 }
 
 async function deleteOrderTemplate(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
 
   const actions = await actionsRepository.getByOrderTemplate(id);
   if (actions.length > 0) return res.status(409).json(`You can't delete an Order Template used by Automations.`);
 
-  await orderTemplatesRepository.deleteOrderTemplate(id);
+  await orderTemplatesRepository.deleteOrderTemplate(userId, id);
   res.sendStatus(204);
 }
 

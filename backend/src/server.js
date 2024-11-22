@@ -3,6 +3,7 @@ const appEm = require('./app-em');
 const appWs = require('./app-ws');
 const settingsRepository = require('./repositories/settingsRepository');
 const automationsRepository = require('./repositories/automationsRepository');
+const usersRepository = require('./repositories/usersRepository');
 const beholder = require('./beholder');
 const agenda = require('./agenda');
 const logger = require('./utils/logger');
@@ -13,6 +14,8 @@ const logger = require('./utils/logger');
   if (!settings) return new Error('There is no settings');
 
   logger('system', 'Initializing the Beholder Brain...');
+
+  const users = await usersRepository.getActiveUsers();
   const automations = await automationsRepository.getActiveAutomations();
   beholder.init(automations);
 
@@ -26,7 +29,7 @@ const logger = require('./utils/logger');
 
   const wss = appWs(server);
 
-  await appEm.init(settings, wss, beholder);
+  await appEm.init(settings, users, wss, beholder);
 
   // const telegram = require('./utils/telegram');
   // telegram(settings, 'Teste robô telegram');

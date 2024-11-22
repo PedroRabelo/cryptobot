@@ -7,7 +7,7 @@ const agenda = require('../agenda');
 const USER_VARIABLES = [indexes.indexKeys.WALLET, indexes.indexKeys.LAST_ORDER]
 
 function getMemory(req, res, next) {
-  const { symbol, index, interval } = req.params;
+  let { symbol, index, interval } = req.params;
   if (USER_VARIABLES.includes(index))
     index = `${index}_${res.locals.token.id}`;
 

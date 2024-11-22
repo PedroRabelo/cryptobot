@@ -31,10 +31,12 @@ function stopStreamMonitor(monitor) {
 }
 
 async function startMonitor(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
   const monitor = await monitorsRepository.getMonitor(id);
   if (monitor.isActive) return res.sendStatus(204);
   if (monitor.isSystemMon) return res.status(403).send(`You can't start or stop the system monitors.`);
+  if (monitor.userId !== userId) return res.sendStatus(403);
 
   startStreamMonitor(monitor);
 
@@ -44,10 +46,12 @@ async function startMonitor(req, res, next) {
 }
 
 async function stopMonitor(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
   const monitor = await monitorsRepository.getMonitor(id);
   if (!monitor.isActive) return res.sendStatus(204);
   if (monitor.isSystemMon) return res.status(403).send(`You can't start or stop the system monitors.`);
+  if (monitor.userId !== userId) return res.sendStatus(403);
 
   stopStreamMonitor(monitor);
 
@@ -57,14 +61,18 @@ async function stopMonitor(req, res, next) {
 }
 
 async function getMonitor(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
   const monitor = await monitorsRepository.getMonitor(id);
+  if (monitor.userId !== userId) return res.sendStatus(403);
+
   res.json(monitor);
 }
 
 async function getMonitors(req, res, next) {
+  const userId = res.locals.token.id;
   const page = req.query.page;
-  const monitors = await monitorsRepository.getMonitors(page);
+  const monitors = await monitorsRepository.getMonitors(userId, page);
   res.json(monitors);
 }
 
@@ -85,7 +93,10 @@ function validateMonitor(newMonitor) {
 
 
 async function insertMonitor(req, res, next) {
+  const userId = res.locals.token.id;
   const newMonitor = validateMonitor(req.body);
+  newMonitor.userId = userId;
+
   const savedMonitor = await monitorsRepository.insertMonitor(newMonitor);
 
   if (savedMonitor.isActive) {
@@ -96,11 +107,13 @@ async function insertMonitor(req, res, next) {
 }
 
 async function updateMonitor(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
   const newMonitor = validateMonitor(req.body);
+  newMonitor.userId = userId;
 
   const currentMonitor = await monitorsRepository.getMonitor(id);
-  if (currentMonitor.isSystemMon) return res.sendStatus(403);
+  if (currentMonitor.isSystemMon || currentMonitor.userId !== userId) return res.sendStatus(403);
 
   const updatedMonitor = await monitorsRepository.updateMonitor(id, newMonitor);
   stopStreamMonitor(currentMonitor)
@@ -113,9 +126,10 @@ async function updateMonitor(req, res, next) {
 }
 
 async function deleteMonitor(req, res, next) {
+  const userId = res.locals.token.id;
   const id = req.params.id;
   const currentMonitor = await monitorsRepository.getMonitor(id);
-  if (currentMonitor.isSystemMon) return res.sendStatus(403);
+  if (currentMonitor.isSystemMon || currentMonitor.userId !== userId) return res.sendStatus(403);
 
   if (currentMonitor.isActive) {
     stopStreamMonitor(currentMonitor);
