@@ -7,19 +7,24 @@ async function getSettings(req, res, next) {
   const id = res.locals.token.id;
   const origin = req.headers.origin;
 
-  let settings;
-  if (origin === process.env.BEHOLDER_URL)
-    settings = await usersRepository.getUser(id);
-  else if (origin === process.env.HYDRA_URL)
-    settings = await settingsRepository.getSettings(id);
+  let entity;
+  if (origin === process.env.BEHOLDER_URL) {
+    entity = await usersRepository.getUser(id);
+    const settings = await settingsRepository.getDefaultSettings();
+    entity.telegramBot = settings.telegramBot;
+  } else if (origin === process.env.HYDRA_URL)
+    entity = await settingsRepository.getSettings(id);
   else
     return res.sendStatus(403);
 
-  const plainSettings = settings.get({ plain: true });
+  const plainSettings = entity.get({ plain: true });
   delete plainSettings.password;
   delete plainSettings.secretKey;
 
-  res.json(settings);
+  if (origin === process.env.BEHOLDER_URL)
+    plainSettings.telegramBot = entity.telegramBot;
+
+  res.json(plainSettings);
 }
 
 async function updateSettings(req, res, next) {

@@ -53,7 +53,7 @@ async function loadWallet(settings, user) {
 
   const info = await exchange.balance();
   const wallet = Object.entries(info).map(async (item) => {
-    const results = await beholder.updateMemory(item[0], `${indexKeys.WALLET}_${userId}`, null, parseFloat(item[1].available));
+    const results = await beholder.updateMemory(item[0], `${indexKeys.WALLET}_${user.id}`, null, parseFloat(item[1].available));
     if (results) results.map(r => WSS.broadcast({ notification: r }));
 
     return {

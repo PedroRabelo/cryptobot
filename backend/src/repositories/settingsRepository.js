@@ -1,23 +1,5 @@
 const settingsModel = require('../models/settingsModel');
 const bcrypt = require('bcryptjs');
-const crypto = require('../utils/crypto');
-
-const settingsCache = {};
-async function getSettingsDecrypted(id) {
-  let settings = settingsCache[id];
-
-  if (!settings) {
-    settings = await getSettings(id);
-    settings.secretKey = crypto.decrypt(settings.secretKey);
-    settingsCache[id] = settings;
-  }
-
-  return settings;
-}
-
-function clearSettingsCache(id) {
-  settingsCache[id] = null;
-}
 
 function getSettingsByEmail(email) {
   return settingsModel.findOne({ where: { email } });
@@ -28,8 +10,7 @@ function getSettings(id) {
 }
 
 async function getDefaultSettings() {
-  const settings = await settingsModel.findOne({ where: { id: process.env.DEFAULT_SETTINGS_ID || 1 } });
-  return getSettingsDecrypted(settings.id);
+  return await settingsModel.findOne({ where: { id: process.env.DEFAULT_SETTINGS_ID || 1 } });
 }
 
 async function updateSettings(id, newSettings) {
@@ -44,16 +25,8 @@ async function updateSettings(id, newSettings) {
   if (newSettings.password)
     currentSettings.password = bcrypt.hashSync(newSettings.password);
 
-  if (newSettings.accessKey && newSettings.accessKey !== currentSettings.accessKey)
-    currentSettings.accessKey = newSettings.accessKey;
-
   if (newSettings.apiUrl && newSettings.apiUrl !== currentSettings.apiUrl)
     currentSettings.apiUrl = newSettings.apiUrl;
-
-  if (newSettings.secretKey) {
-    currentSettings.secretKey = crypto.encrypt(newSettings.secretKey);
-    clearSettingsCache(id);
-  }
 
   if (newSettings.streamUrl && newSettings.streamUrl !== currentSettings.streamUrl)
     currentSettings.streamUrl = newSettings.streamUrl;
@@ -73,14 +46,17 @@ async function updateSettings(id, newSettings) {
   if (newSettings.telegramBot && newSettings.telegramBot !== currentSettings.telegramBot)
     currentSettings.telegramBot = newSettings.telegramBot;
 
+  if (newSettings.telegramToken && newSettings.telegramToken !== currentSettings.telegramToken)
+    currentSettings.telegramToken = newSettings.telegramToken;
+
   if (newSettings.telegramChat && newSettings.telegramChat !== currentSettings.telegramChat)
     currentSettings.telegramChat = newSettings.telegramChat;
 
   await currentSettings.save();
+  return currentSettings;
 }
 
 module.exports = {
-  getSettingsDecrypted,
   getSettingsByEmail,
   getSettings,
   updateSettings,

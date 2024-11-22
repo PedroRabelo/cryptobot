@@ -19,14 +19,13 @@ const settingsModel = database.define('settings', {
   phone: Sequelize.STRING,
   apiUrl: Sequelize.STRING,
   streamUrl: Sequelize.STRING,
-  accessKey: Sequelize.STRING,
-  secretKey: Sequelize.STRING,
   sendGridKey: Sequelize.STRING,
   twilioSid: Sequelize.STRING,
   twilioToken: Sequelize.STRING,
   twilioPhone: Sequelize.STRING,
   telegramBot: Sequelize.STRING,
   telegramChat: Sequelize.STRING,
+  telegramToken: Sequelize.STRING,
   createdAt: Sequelize.DATE,
   updatedAt: Sequelize.DATE
 }, {

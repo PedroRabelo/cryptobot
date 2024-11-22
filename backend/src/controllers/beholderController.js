@@ -1,4 +1,4 @@
-const { getAutomations } = require('../repositories/automationRepository');
+const { getAutomations } = require('../repositories/automationsRepository');
 const { getActiveUserMonitors } = require('../repositories/monitorsRepository');
 const beholder = require('../beholder');
 const indexes = require('../utils/indexes');
