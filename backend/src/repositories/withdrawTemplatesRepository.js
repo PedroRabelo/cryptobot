@@ -58,11 +58,19 @@ async function updateWithdrawTemplate(userId, id, newWithdrawTemplate) {
   return currentWithdrawTemplate;
 }
 
+function deleteAll(userId, transaction) {
+  return withdrawTemplateModel.destroy({
+    where: { userId },
+    transaction
+  })
+}
+
 module.exports = {
   insertWithdrawTemplate,
   deleteWithdrawTemplate,
   deleteWithdrawTemplates,
   getWithdrawTemplate,
   getWithdrawTemplates,
-  updateWithdrawTemplate
+  updateWithdrawTemplate,
+  deleteAll
 }

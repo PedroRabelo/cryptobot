@@ -166,6 +166,13 @@ const STOP_TYPES = [orderTypes.STOP_LOSS, orderTypes.STOP_LOSS_LIMIT, orderTypes
 
 const LIMIT_TYPES = [orderTypes.LIMIT, orderTypes.STOP_LOSS_LIMIT, orderTypes.TAKE_PROFIT_LIMIT];
 
+function deleteAll(userId, transaction) {
+  return orderModel.destroy({
+    where: { userId },
+    transaction
+  })
+}
+
 module.exports = {
   STOP_TYPES,
   LIMIT_TYPES,
@@ -179,5 +186,6 @@ module.exports = {
   updateOrderByOrderId,
   getOrders,
   getLastFilledOrders,
-  removeAutomationFromOrders
+  removeAutomationFromOrders,
+  deleteAll
 }

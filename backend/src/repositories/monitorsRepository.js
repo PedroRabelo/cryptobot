@@ -95,6 +95,13 @@ function getMonitors(userId, page = 1) {
   });
 }
 
+function deleteAll(userId, transaction) {
+  return monitorModel.destroy({
+    where: { userId },
+    transaction
+  })
+}
+
 module.exports = {
   monitorTypes,
   monitorExists,
@@ -104,5 +111,6 @@ module.exports = {
   getMonitor,
   updateMonitor,
   getActiveSystemMonitors,
-  getActiveUserMonitors
+  getActiveUserMonitors,
+  deleteAll
 }

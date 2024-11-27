@@ -96,6 +96,13 @@ function getOrderTemplatesByGridName(userId, gridName) {
   })
 }
 
+function deleteAll(userId, transaction) {
+  return orderTemplateModel.destroy({
+    where: { userId },
+    transaction
+  })
+}
+
 module.exports = {
   getOrderTemplate,
   getOrderTemplates,
@@ -104,5 +111,6 @@ module.exports = {
   deleteOrderTemplate,
   deleteOrderTemplatesByGridName,
   getOrderTemplatesByGridName,
-  getAllOrderTemplates
+  getAllOrderTemplates,
+  deleteAll
 }

@@ -70,6 +70,13 @@ async function updateAutomation(id, newAutomation) {
   return currentAutomation;
 }
 
+function deleteAll(userId, transaction) {
+  return automationModel.destroy({
+    where: { userId },
+    transaction
+  })
+}
+
 module.exports = {
   getActiveAutomations,
   getAutomation,
@@ -77,5 +84,6 @@ module.exports = {
   insertAutomation,
   deleteAutomation,
   updateAutomation,
-  automationExists
+  automationExists,
+  deleteAll
 }

@@ -1,4 +1,13 @@
 const usersRepository = require('../repositories/usersRepository');
+const automationsRepository = require('../repositories/automationsRepository');
+const monitorsRepository = require('../repositories/monitorsRepository');
+const ordersRepository = require('../repositories/ordersRepository');
+const orderTemplatesRepository = require('../repositories/orderTemplatesRepository');
+const withdrawTemplatesRepository = require('../repositories/withdrawTemplatesRepository');
+const actionsRepository = require('../repositories/actionsRepository');
+const favoriteSymbolsRepository = require('../repositories/favoriteSymbolsRepository');
+const gridsRepository = require('../repositories/gridsRepository');
+const db = require('../db');
 
 async function getUsers(req, res, next) {
   const page = req.query.page;
@@ -106,7 +115,7 @@ async function updateUser(req, res, next) {
 
 async function deleteUser(req, res, next) {
   const id = req.params.id;
-  const user = await usersRepository.getUser(id);
+  const user = await usersRepository.getUser(id, true);
 
   if (user.isActive) {
     //await stopUserMonitors(updatedUser);
@@ -114,8 +123,29 @@ async function deleteUser(req, res, next) {
     //await sendStopAlerts(updatedUser);
   }
 
-  await usersRepository.deleteUser(id);
-  res.sendStatus(204);
+  const transaction = await db.transaction();
+
+  try {
+    await favoriteSymbolsRepository.deleteAll(id, transaction);
+    await ordersRepository.deleteAll(id, transaction);
+    await orderTemplatesRepository.deleteAll(id, transaction);
+    await withdrawTemplatesRepository.deleteAll(id, transaction);
+    await monitorsRepository.deleteAll(id, transaction);
+
+    const automationsId = user.automations.map(a => a.id);
+    await actionsRepository.deleteActions(automationsId, transaction);
+    await gridsRepository.deleteGrids(automationsId, transaction);
+    await automationsRepository.deleteAll(id, transaction);
+
+    await usersRepository.deleteUser(id, transaction);
+
+    await transaction.commit();
+    res.sendStatus(204);
+  } catch (error) {
+    await transaction.rollback();
+    logger('system', err);
+    return res.status(500).json(`There was an error to delete the user.`);
+  }
 }
 
 module.exports = {
