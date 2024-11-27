@@ -5,9 +5,9 @@ const profileMiddleware = require('../middlewares/profileMiddleware');
 
 router.post('/sync', profileMiddleware, symbolsController.syncSymbols);
 
-router.get('/:symbol', symbolsController.getSymbol);
+router.patch('/:symbol', symbolsController.updateSymbol);
 
-router.patch('/:symbol', profileMiddleware, symbolsController.updateSymbol);
+router.get('/:symbol', symbolsController.getSymbol);
 
 router.get('/', symbolsController.getSymbols);
 

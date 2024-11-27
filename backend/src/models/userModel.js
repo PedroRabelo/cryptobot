@@ -4,7 +4,7 @@ const AutomationModel = require('./automationModel');
 const MonitorModel = require('./monitorModel');
 const OrderTemplateModel = require('./orderTemplateModel');
 const WithdrawTemplateModel = require('./withdrawTemplateModel');
-const OrderModel = require('./orderModel');
+const FavoriteSymbolModel = require('./favoriteSymbolModel');
 
 const userModel = database.define('user', {
   id: {
@@ -60,7 +60,7 @@ userModel.hasMany(WithdrawTemplateModel, {
   foreignKey: 'userId'
 });
 
-userModel.hasMany(OrderModel, {
+userModel.hasMany(FavoriteSymbolModel, {
   foreignKey: 'userId'
 });
 

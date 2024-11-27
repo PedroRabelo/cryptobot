@@ -11,12 +11,12 @@ function getManySymbols(symbols) {
   })
 }
 
-function searchSymbols(search, onlyFavorites = false, page = 1) {
+function searchSymbols(search, page = 1, pageSize = 10) {
   const options = {
     where: {},
     order: [['symbol', 'ASC']],
-    limit: 10,
-    offset: 10 * (page - 1)
+    limit: pageSize,
+    offset: pageSize * (page - 1)
   }
 
   if (search) {
@@ -25,8 +25,6 @@ function searchSymbols(search, onlyFavorites = false, page = 1) {
     else
       options.where = { symbol: search };
   }
-
-  if (onlyFavorites) options.where.isFavorite = true;
 
   return symbolModel.findAndCountAll(options)
 }
@@ -49,10 +47,6 @@ async function updateSymbol(symbol, newSymbol) {
 
   if (newSymbol.minLotSize && newSymbol.minLotSize !== currentSymbol.minLotSize)
     currentSymbol.minLotSize = newSymbol.minLotSize;
-
-  if (newSymbol.isFavorite !== null && newSymbol.isFavorite !== undefined
-    && newSymbol.isFavorite !== currentSymbol.isFavorite)
-    currentSymbol.isFavorite = newSymbol.isFavorite;
 
   if (newSymbol.base && newSymbol.base !== currentSymbol.base)
     currentSymbol.base = newSymbol.base;
