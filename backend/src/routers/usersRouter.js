@@ -5,7 +5,7 @@ const profileMiddleware = require('../middlewares/profileMiddleware');
 
 router.delete('/:id', profileMiddleware, usersController.deleteUser);
 
-//router.get('/active', usersController.getActiveUsers);
+router.get('/active', profileMiddleware, usersController.getActiveUsers);
 
 router.get('/:search?', profileMiddleware, usersController.getUsers);
 

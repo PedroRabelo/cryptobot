@@ -148,6 +148,18 @@ async function deleteUser(req, res, next) {
   }
 }
 
+async function getActiveUsers(req, res, next) {
+  let users = await usersRepository.getActiveUsers();
+  users = users.map(u => {
+    const plainUser = u.get({ plain: true });
+    plainUser.secretKey = '';
+    plainUser.password = '';
+    return plainUser;
+  })
+
+  res.json(users);
+}
+
 module.exports = {
   getUsers,
   insertUser,
@@ -155,5 +167,6 @@ module.exports = {
   deleteUser,
   startUser,
   stopUser,
-  resetUserPassword
+  resetUserPassword,
+  getActiveUsers
 }
