@@ -3,6 +3,7 @@ const actionsRepository = require('../repositories/actionsRepository');
 const gridsRepository = require('../repositories/gridsRepository');
 const orderTemplatesRepository = require('../repositories/orderTemplatesRepository');
 const ordersRepository = require('../repositories/ordersRepository');
+const usersRepository = require('../repositories/usersRepository');
 const beholder = require('../beholder');
 const agenda = require('../agenda');
 const db = require('../db');
@@ -94,6 +95,10 @@ async function insertAutomation(req, res, next) {
   if (isGrid && (!quantity || !levels)) {
     return res.status(400).json(`Invalid grid params.`);
   }
+
+  const user = await usersRepository.getUser(userId, true);
+  if (user.automations.length >= user.limit.maxAutomations)
+    return res.status(409).send(`You have reached the max automations in you plan.`);
 
   const alreadyExists = await automationsRepository.automationExists(userId, newAutomation.name);
   if (alreadyExists)

@@ -70,6 +70,9 @@ app.use('/logs', authMiddleware, logsRouter);
 const usersRouter = require('./routers/usersRouter');
 app.use('/users', authMiddleware, usersRouter);
 
+const limitsRouter = require('./routers/limitsRouter');
+app.use('/limits', authMiddleware, profileMiddleware, limitsRouter);
+
 app.use(require('./middlewares/errorMIddleware'));
 
 module.exports = app;

@@ -1,4 +1,5 @@
 const monitorsRepository = require('../repositories/monitorsRepository');
+const usersRepository = require('../repositories/usersRepository');
 const appEm = require('../app-em');
 const { monitorTypes } = require('../repositories/monitorsRepository');
 
@@ -96,6 +97,10 @@ async function insertMonitor(req, res, next) {
   const userId = res.locals.token.id;
   const newMonitor = validateMonitor(req.body);
   newMonitor.userId = userId;
+
+  const user = await usersRepository.getUser(userId, true);
+  if (user.monitors.length >= user.limit.maxMonitors)
+    return res.status(409).send(`You have reached the max monitors in you plan.`);
 
   const savedMonitor = await monitorsRepository.insertMonitor(newMonitor);
 

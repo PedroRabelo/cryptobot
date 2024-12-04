@@ -11,9 +11,10 @@ const db = require('../db');
 
 async function getUsers(req, res, next) {
   const page = req.query.page;
+  const pageSize = req.query.pageSize;
   const search = req.params.search;
 
-  const result = await usersRepository.getUsers(search, page);
+  const result = await usersRepository.getUsers(search, page, pageSize);
   result.rows = result.rows.map(r => {
     const plainUser = r.get({ plain: true });
     plainUser.password = '';

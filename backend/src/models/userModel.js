@@ -5,6 +5,7 @@ const MonitorModel = require('./monitorModel');
 const OrderTemplateModel = require('./orderTemplateModel');
 const WithdrawTemplateModel = require('./withdrawTemplateModel');
 const FavoriteSymbolModel = require('./favoriteSymbolModel');
+const LimitModel = require('./limitModel');
 
 const userModel = database.define('user', {
   id: {
@@ -42,6 +43,10 @@ const userModel = database.define('user', {
     unique: true,
     fields: ['email']
   }]
+})
+
+userModel.belongsTo(LimitModel, {
+  foreignKey: 'limitId'
 })
 
 userModel.hasMany(AutomationModel, {
