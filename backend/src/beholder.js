@@ -3,6 +3,7 @@ const { actionsTypes } = require('./repositories/actionsRepository');
 const orderTemplatesRepository = require('./repositories/orderTemplatesRepository');
 const automationsRepository = require('./repositories/automationsRepository');
 const withdrawTemplatesRepository = require('./repositories/withdrawTemplatesRepository');
+const { getUser } = require('./repositories/usersRepository');
 const { getSymbol } = require('./repositories/symbolsRepository');
 const { STOP_TYPES, LIMIT_TYPES, insertOrder } = require('./repositories/ordersRepository');
 const db = require('./db');
@@ -166,20 +167,20 @@ function invertCondition(memoryKey, conditions) {
   return false;
 }
 
-async function sendEmail(settings, automation) {
-  await require('./utils/email')(settings, `${automation.name} has fired! ${automation.conditions}`);
+async function sendEmail(settings, user, automation, subject) {
+  await require('./utils/email')(settings, `${automation.name} has fired! ${automation.conditions}`, user.email, subject);
   if (automation.logs) logger('A:' + automation.id, 'E-mail sent!');
   return { type: 'success', text: `E-mail sent from automation ${automation.name}` };
 }
 
-async function sendSms(settings, automation) {
-  await require('./utils/sms')(settings, `${automation.name} has fired!`);
-  if (automation.logs(logger('A:' + automation.id, 'SMS sent!')));
+async function sendSms(settings, user, automation) {
+  await require('./utils/sms')(settings, `${automation.name} has fired!`, user.phone);
+  if (automation.logs) logger('A:' + automation.id, 'SMS sent!');
   return { type: 'success', text: `SMS sent from automation ${automation.name}!` };
 }
 
-async function sendTelegram(settings, automation) {
-  await require('./utils/telegram')(settings, `${automation.name} has fired!`);
+async function sendTelegram(settings, user, automation) {
+  await require('./utils/telegram')(settings, `${automation.name} has fired!`, user.telegramChat);
   if (automation.logs(logger('A:' + automation.id, 'Telegram message sent!')));
   return { type: 'success', text: `Telegram message sent from automation ${automation.name}!` };
 }
@@ -579,12 +580,12 @@ async function trailingEval(settings, automation, action) {
   }
 }
 
-function doAction(settings, action, automation) {
+function doAction(settings, user, action, automation) {
   try {
     switch (action.type) {
-      case actionsTypes.ALERT_EMAIL: return sendEmail(settings, automation);
-      case actionsTypes.ALERT_SMS: return sendSms(settings, automation);
-      case actionsTypes.ALERT_TELEGRAM: return sendTelegram(settings, automation);
+      case actionsTypes.ALERT_EMAIL: return sendEmail(settings, user, automation);
+      case actionsTypes.ALERT_SMS: return sendSms(settings, user, automation);
+      case actionsTypes.ALERT_TELEGRAM: return sendTelegram(settings, user, automation);
       case actionsTypes.ORDER: return placeOrder(settings, automation, action);
       case actionsTypes.TRAILING: return trailingEval(settings, automation, action);
       case actionsTypes.WITHDRAW: return withdrawCrypto(settings, automation, action);
@@ -627,11 +628,12 @@ async function evalDecision(memoryKey, automation) {
       logger('A:' + automation.id, `Beholder evaluated a condition at automation: ${automation.name}`);
 
     const settings = await getDefaultSettings();
+    const user = await getUser(automation.userId);
     let results = [];
 
     for (let i = 0; i < automation.actions.length; i++) {
       const action = automation.action[i];
-      const result = await doAction(settings, action, automation);
+      const result = await doAction(settings, user, action, automation);
       if (!result || result.type === 'error') break;
 
       results.push(result);
