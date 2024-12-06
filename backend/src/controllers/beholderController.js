@@ -41,6 +41,11 @@ function getAgenda(req, res, next) {
   res.json(agenda.getAgenda());
 }
 
+async function getStreams(req, res, next) {
+  const appEm = require('../app-em');
+  res.json(appEm.getConnections());
+}
+
 async function init(req, res, next) {
   const automations = await getAutomations();
   beholder.init(automations);
@@ -54,5 +59,6 @@ module.exports = {
   getBrainIndexes,
   getAnalysisIndexes,
   getAgenda,
+  getStreams,
   init
 }

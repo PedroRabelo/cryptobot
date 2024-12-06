@@ -17,15 +17,14 @@ function startMiniTickerMonitor(monitorId, broadcastLabel, logs) {
       delete mkt[1].eventTime;
       const converted = {};
       Object.entries(mkt[1]).map(prop => converted[prop[0]] = parseFloat(prop[1]));
-      const results = await beholder.updateMemory(mkt[0], indexKeys.MINI_TICKER, null, converted);
-      if (results) results.map(r => WSS.broadcast({ notification: r }));
+      await beholder.updateMemory(mkt[0], indexKeys.MINI_TICKER, null, converted);
     })
 
     if (broadcastLabel && WSS)
       WSS.broadcast({ [broadcastLabel]: markets });
 
     //simulação de book
-    const books = Object.entries(markets).map(mkt => {
+    const books = Object.entries(markets).map(async mkt => {
       const book = { symbol: mkt[0], bestAsk: mkt[1].close, bestBid: mkt[1].close };
       const currentMemory = beholder.getMemory(mkt[0], indexKeys.BOOK);
 
@@ -33,11 +32,7 @@ function startMiniTickerMonitor(monitorId, broadcastLabel, logs) {
       newMemory.previous = currentMemory ? currentMemory.current : book;
       newMemory.current = book;
 
-      beholder.updateMemory(mkt[0], indexKeys.BOOK, null, newMemory)
-        .then(results => {
-          if (results)
-            results.map(r => WSS.broadcast({ notification: r }));
-        })
+      await beholder.updateMemory(mkt[0], indexKeys.BOOK, null, newMemory);
 
       return book;
     })
@@ -54,7 +49,7 @@ async function loadWallet(settings, user) {
   const info = await exchange.balance();
   const wallet = Object.entries(info).map(async (item) => {
     const results = await beholder.updateMemory(item[0], `${indexKeys.WALLET}_${user.id}`, null, parseFloat(item[1].available));
-    if (results) results.map(r => WSS.broadcast({ notification: r }));
+    if (results) results.map(r => WSS.direct(user.id, { notification: r }));
 
     return {
       symbol: item[0],
@@ -65,7 +60,7 @@ async function loadWallet(settings, user) {
   return wallet;
 }
 
-function notifyOrderUpdate(order) {
+function notifyOrderUpdate(userId, order) {
   let type = '';
   switch (order.status) {
     case 'FILLED': type = 'success'; break;
@@ -73,10 +68,10 @@ function notifyOrderUpdate(order) {
     case 'EXPIRED': type = 'error'; break;
     default: type = 'info'; break;
   }
-  WSS.broadcast({ notification: { type, text: `Order #${order.orderId} was updated as ${order.status}` } });
+  WSS.direct(userId, { notification: { type, text: `Order #${order.orderId} was updated as ${order.status}` } });
 }
 
-async function processExecutionData(monitorId, executionData, broadcastLabel) {
+async function processExecutionData(userId, monitorId, executionData, broadcastLabel) {
 
   if (executionData.x === 'NEW') return;
 
@@ -106,18 +101,16 @@ async function processExecutionData(monitorId, executionData, broadcastLabel) {
       const updatedOrder = await ordersRepository.updateOrderByOrderId(order.orderId, order.clientOrderId, order)
       if (updatedOrder) {
 
-        notifyOrderUpdate(order);
+        notifyOrderUpdate(userId, order);
 
         const orderCopy = getLightOrder(updatedOrder.get({ plain: true }));
-
         const results = await beholder.updateMemory(order.symbol, indexKeys.LAST_ORDER, null, orderCopy);
-
-        if (results) results.map(r => WSS.broadcast({ notification: r }));
+        if (results) results.map(r => WSS.direct(userId, { notification: r }));
         if (broadcastLabel && WSS)
-          WSS.broadcast({ [broadcastLabel]: orderCopy })
+          WSS.direct(userId, { [broadcastLabel]: orderCopy })
       }
     } catch (error) {
-      logger('M:' + monitorId, error);
+      logger(`M:${monitorId}-${userId}`, error);
     }
 
   }, 3000)
@@ -131,18 +124,18 @@ async function startUserDataMonitor(settings, user, monitorId, broadcastLabel, l
   const exchange = require('./utils/exchange')(settings, user);
   exchange.userDataStream(
     async balanceData => {
-      if (logs) logger('M:' + monitorId, balanceData);
+      if (logs) logger(`M:${monitorId}-${user.id}`, balanceData);
       const wallet = await loadWallet(settings, user);
       if (balanceBroadcast && WSS)
-        WSS.broadcast({ [balanceBroadcast]: wallet })
+        WSS.direct(user.id, { [balanceBroadcast]: wallet })
     },
     executionData => {
-      if (logs) logger('M:' + monitorId, executionData);
+      if (logs) logger(`M:${monitorId}-${user.id}`, executionData);
 
-      processExecutionData(monitorId, executionData, executionBroadcast);
+      processExecutionData(user.id, monitorId, executionData, executionBroadcast);
     }
   );
-  logger('M:' + monitorId, `User Data Monitor has started at ${broadcastLabel}`);
+  logger(`M:${monitorId}-${user.id}`, `User Data Monitor has started at ${broadcastLabel}`);
 }
 
 async function processChartData(monitorId, symbol, indexes, interval, ohlc, logs) {
@@ -173,7 +166,7 @@ async function processChartData(monitorId, symbol, indexes, interval, ohlc, logs
   }))
 }
 
-function startChartMonitor(monitorId, symbol, interval, indexes, broadcastLabel, logs) {
+function startChartMonitor(userId, monitorId, symbol, interval, indexes, broadcastLabel, logs) {
   if (!symbol) return new Error(`You can't start a chart monitor without a symbol`);
   if (!anonymousExchange) return new Error(`Exchange Monitor not initializer yet.`);
 
@@ -208,16 +201,14 @@ function startChartMonitor(monitorId, symbol, interval, indexes, broadcastLabel,
       beholder.updateMemory(symbol, indexKeys.LAST_CANDLE, interval, { current: lastCandle, previous: previousCandle }, false);
       beholder.updateMemory(symbol, indexKeys.PREVIOUS_CANDLE, interval, { current: previousCandle, previous: previousPreviousCandle }, false);
 
-      if (broadcastLabel && WSS) sendMessage({ [broadcastLabel]: lastCandle });
+      if (broadcastLabel && WSS) sendMessage(userId, { [broadcastLabel]: lastCandle });
 
       let results = await processChartData(monitorId, symbol, indexes, interval, ohlc, logs);
 
-      if (results) {
-        //results.push(await beholder.testAutomations(beholder.parseMemoryKey(symbol, indexKeys.LAST_CANDLE, interval)));
-        //results.push(await beholder.testAutomations(beholder.parseMemoryKey(symbol, indexKeys.PREVIOUS_CANDLE, interval)));
-
-        if (logs) logger('M:' + monitorId, `chartStream Results: ${results}`);
-        results.flat().map(r => sendMessage({ notification: r }));
+      if (results && (Array.isArray(results) && results.length > 0 && results[0])) {
+        if (logs)
+          logger('M:' + monitorId, `chartStream Results: ${JSON.stringify(results)}`);
+        results.flat().map(r => sendMessage(userId, { notification: r }));
       }
     } catch (err) {
       if (logs) logger('M:' + monitorId, err);
@@ -268,7 +259,7 @@ function getLightTicker(data) {
   return data;
 }
 
-function startTickerMonitor(monitorId, symbol, broadcastLabel, logs) {
+function startTickerMonitor(userId, monitorId, symbol, broadcastLabel, logs) {
   if (!symbol) return new Error(`You can't start a ticker monitor without a symbol`);
   if (!anonymousExchange) return new Error(`Exchange Monitor not initializer yet.`);
 
@@ -285,7 +276,7 @@ function startTickerMonitor(monitorId, symbol, broadcastLabel, logs) {
 
       await beholder.updateMemory(data.symbol, indexKeys.TICKER, null, newMemory);
 
-      if (WSS && broadcastLabel) WSS.broadcastLabel({ [broadcastLabel]: data });
+      if (WSS && broadcastLabel) WSS.direct(userId, { [broadcastLabel]: data });
     } catch (err) {
       if (logs) logger('M:' + monitorId, err)
     }
@@ -305,8 +296,19 @@ function stopTickerMonitor(monitorId, symbol, logs) {
   beholder.deleteMemory(symbol, indexKeys.TICKER);
 }
 
-function sendMessage(json) {
-  return WSS.broadcast(json);
+function sendMessage(userId, jsonObject) {
+  try {
+    if (jsonObject.notification)
+      push.send(userId, jsonObject.notification.text, 'Beholder Notification', jsonObject.notification);
+  } catch (err) {
+
+  }
+
+  return WSS.direct(userId, jsonObject);
+}
+
+function getConnections() {
+  return WSS.getConnections();
 }
 
 async function init(settings, users, wssInstance, beholderInstance) {
@@ -317,34 +319,47 @@ async function init(settings, users, wssInstance, beholderInstance) {
   anonymousExchange = require('./utils/exchange')(settings);
 
   const monitors = await getActiveSystemMonitors();
-  const user = users[0];
+  const miniTickerMonitor = monitors.find(m => m.type === monitorTypes.MINI_TICKER);
 
-  monitors.map(monitor => {
-    setTimeout(() => {
-      switch (monitor.type) {
-        case monitorTypes.MINI_TICKER:
-          return startMiniTickerMonitor(monitor.id, monitor.broadcastLabel, monitor.logs);
-        case monitorTypes.BOOK:
-          return;
-        case monitorTypes.USER_DATA:
-          return startUserDataMonitor(settings, user, monitor.id, monitor.broadcastLabel, monitor.logs);
-        case monitorTypes.CANDLES:
-          return startChartMonitor(monitor.id, monitor.symbol,
-            monitor.interval,
-            monitor.indexes.split(','),
-            monitor.broadcastLabel,
-            monitor.logs);
-        case monitorTypes.TICKER:
-          return startTickerMonitor(monitor.id, monitor.symbol, monitor.broadcastLabel, monitor.logs);
-      }
-    }, 250);
-  })
+  if (miniTickerMonitor)
+    startMiniTickerMonitor(miniTickerMonitor.id, miniTickerMonitor.broadcastLabel, miniTickerMonitor.logs);
 
-  const lastOrders = await ordersRepository.getLastFilledOrders(user.id);
-  await Promise.all(lastOrders.map(async (order) => {
-    const orderCopy = getLightOrder(order.get({ plain: true }));
-    await beholder.updateMemory(order.symbol, `${indexKeys.LAST_ORDER}_${user.id}`, null, orderCopy, false);
-  }));
+  const userDataMonitor = monitors.find(m => m.type === monitorTypes.USER_DATA);
+
+  if (users) {
+    for (let i = 0; i < users.length; i++) {
+      const user = users[i];
+
+      setTimeout(async () => {
+
+        if (!user.accessKey || !user.secretKey) return;
+        if (userDataMonitor && userDataMonitor.isActive) user.monitors.push(userDataMonitor);
+
+        user.monitors.filter(m => m.isActive).map(monitor => {
+          setTimeout(() => {
+            switch (monitor.type) {
+              case monitorTypes.USER_DATA:
+                return startUserDataMonitor(settings, user, monitor.id, monitor.broadcastLabel, monitor.logs);
+              case monitorTypes.CANDLES:
+                return startChartMonitor(user.id, monitor.id, monitor.symbol,
+                  monitor.interval,
+                  monitor.indexes.split(','),
+                  monitor.broadcastLabel,
+                  monitor.logs);
+              case monitorTypes.TICKER:
+                return startTickerMonitor(user.id, monitor.id, monitor.symbol, monitor.broadcastLabel, monitor.logs);
+            }
+          }, 250);
+        })
+
+        const lastOrders = await ordersRepository.getLastFilledOrders(user.id);
+        await Promise.all(lastOrders.map(async (order) => {
+          const orderCopy = getLightOrder(order.get({ plain: true }));
+          await beholder.updateMemory(order.symbol, `${indexKeys.LAST_ORDER}_${user.id}`, null, orderCopy, false);
+        }));
+      }, i * (user.monitors.length + 1) * 250)
+    }
+  }
 
   logger('system', 'App Exchange Monitor is running');
 }
@@ -380,5 +395,6 @@ module.exports = {
   startTickerMonitor,
   stopTickerMonitor,
   sendMessage,
-  loadWallet
+  loadWallet,
+  getConnections
 }

@@ -115,6 +115,7 @@ async function getActiveLaunchUsers() {
 async function getActiveUsers() {
   const users = await userModel.findAll({
     where: { isActive: true },
+    include: [MonitorModel, AutomationModel]
   });
 
   for (let i = 0; i < users.length; i++) {

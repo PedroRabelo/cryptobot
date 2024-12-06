@@ -15,6 +15,8 @@ router.get('/brain', profileMiddleware, beholderController.getBrain);
 
 router.get('/agenda', profileMiddleware, beholderController.getAgenda);
 
+router.get('/streams', profileMiddleware, beholderController.getStreams);
+
 router.post('/init', profileMiddleware, beholderController.init);
 
 module.exports = router;

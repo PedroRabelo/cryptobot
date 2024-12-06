@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const authController = require('./controllers/authController');
 const logger = require('./utils/logger');
+const { json } = require('sequelize');
 
 function onMessage(data) {
   logger('system', `app-ws.onMessage: ${data}`);
@@ -11,10 +12,30 @@ function onError(err) {
   logger('system', `app-ws.onError: ${err.message}`);
 }
 
+function isConnected(userId) {
+  if (!this.clients) return false;
+  return [...this.clients].some(c => c.id == userId);
+}
+
+function getConnections() {
+  if (!this.clients) return [];
+  return [...this.clients].map(c => c.id);
+}
+
 function onConnection(ws, req) {
+  const token = jwt.decode(req.url.split('token=')[1]);
+  ws.id = token.profile === 'ADMIN' ? 'ADMIN' : token.id;
   ws.on('message', onMessage);
   ws.on('error', onError);
   logger('system', `app-ws.onConnection`);
+}
+
+function direct(userId, jsonObject) {
+  if (!this.clients) return;
+  this.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN && client.id == userId)
+      client.send(JSON.stringify(jsonObject));
+  })
 }
 
 const whitelist = (process.env.CORS_ORIGIN || '*').split(',');
@@ -32,7 +53,7 @@ function verifyClient(info, callback) {
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      if (decoded && !authController.isBlacklisted(token)) {
+      if (decoded && !authController.isBlacklisted(token) && !isConnected(decoded.id)) {
         return callback(true)
       }
     } catch (err) {
@@ -60,6 +81,8 @@ module.exports = (server) => {
 
   wss.on('connection', onConnection);
   wss.broadcast = broadcast;
+  wss.direct = direct;
+  wss.getConnections = getConnections;
   logger('system', 'App Web Socket is running!');
 
   return wss;
