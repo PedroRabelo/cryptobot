@@ -823,6 +823,11 @@ function searchMemory() {
   });
 }
 
+function clearWallet(userId) {
+  const balances = searchMemory(new RegExp(`^(.+:WALLET_${userId})$`));
+  balances.map(b => delete MEMORY[b.key]);
+}
+
 module.exports = {
   updateMemory,
   deleteMemory,
@@ -838,5 +843,6 @@ module.exports = {
   generateGrids,
   evalDecision,
   searchMemory,
-  parseMemoryKey
+  parseMemoryKey,
+  clearWallet
 }

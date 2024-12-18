@@ -116,6 +116,8 @@ async function processExecutionData(userId, monitorId, executionData, broadcastL
   }, 3000)
 }
 
+const EXCHANGES = {};
+
 async function startUserDataMonitor(settings, user, monitorId, broadcastLabel, logs) {
   const [balanceBroadcast, executionBroadcast] = broadcastLabel ? broadcastLabel.split(',') : [null, null];
 
@@ -135,7 +137,18 @@ async function startUserDataMonitor(settings, user, monitorId, broadcastLabel, l
       processExecutionData(user.id, monitorId, executionData, executionBroadcast);
     }
   );
+  EXCHANGES[user.id] = exchange;
   logger(`M:${monitorId}-${user.id}`, `User Data Monitor has started at ${broadcastLabel}`);
+}
+
+async function stopUserDataMonitor(user, monitorId, logs) {
+  const exchange = EXCHANGES[user.id];
+  if (!exchange) return;
+
+  exchange.terminateUserDataStream();
+  if (logs) logger(`M:${monitorId}-${user.id}`, `User Data Monitor ${monitorId}-${user.id} stopped!`);
+
+  beholder.clearWallet(user.id);
 }
 
 async function processChartData(monitorId, symbol, indexes, interval, ohlc, logs) {
@@ -396,5 +409,7 @@ module.exports = {
   stopTickerMonitor,
   sendMessage,
   loadWallet,
-  getConnections
+  getConnections,
+  startUserDataMonitor,
+  stopUserDataMonitor
 }

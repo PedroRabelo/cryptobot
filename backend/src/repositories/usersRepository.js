@@ -52,12 +52,10 @@ async function updateUser(id, newUser) {
   if (newUser.email && newUser.email !== currentUser.email)
     currentUser.email = newUser.email;
 
-  if (newUser.phone !== null && newUser.phone !== undefined
-    && newUser.phone !== currentUser.phone)
+  if (newUser.phone !== null && newUser.phone !== currentUser.phone)
     currentUser.phone = newUser.phone;
 
-  if (newUser.telegramChat !== null && newUser.telegramChat !== undefined
-    && newUser.telegramChat !== currentUser.telegramChat)
+  if (newUser.telegramChat !== null && newUser.telegramChat !== currentUser.telegramChat)
     currentUser.telegramChat = newUser.telegramChat;
 
   if (newUser.limitId && newUser.limitId !== currentUser.limitId)
