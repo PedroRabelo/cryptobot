@@ -3,43 +3,55 @@ const { monitorTypes, getActiveSystemMonitors } = require('./repositories/monito
 const { execCalc, indexKeys } = require('./utils/indexes');
 const logger = require('./utils/logger');
 
-let WSS, beholder, anonymousExchange;
+let WSS, hydra, anonymousExchange;
 
-function startMiniTickerMonitor(monitorId, broadcastLabel, logs) {
-  if (!anonymousExchange) return new Error(`Exchange Monitor not initializer yet.`);
-
-  anonymousExchange.miniTickerStream(async (markets) => {
+function startTickerMonitor(monitorId, broadcastLabel, logs) {
+  if (!anonymousExchange) return new Error('Exchange Monitor not initialized yet.');
+  anonymousExchange.tickerStream(async (markets) => {
     if (logs) logger('M:' + monitorId, markets);
 
-    Object.entries(markets).map(async (mkt) => {
-      delete mkt[1].volume;
-      delete mkt[1].quoteVolume;
-      delete mkt[1].eventTime;
-      const converted = {};
-      Object.entries(mkt[1]).map(prop => converted[prop[0]] = parseFloat(prop[1]));
-      await beholder.updateMemory(mkt[0], indexKeys.MINI_TICKER, null, converted);
-    })
+    try {
+      markets.map(mkt => hydra.updateMemory(mkt.symbol, indexKeys.TICKER, null, mkt[1]));
 
-    if (broadcastLabel && WSS)
-      WSS.broadcast({ [broadcastLabel]: markets });
+      const obj = {};
+      markets.map(mkt => obj[mkt.symbol] = mkt);
+      if (broadcastLabel && WSS) WSS.broadcast({ [broadcastLabel]: obj });
 
-    //simulação de book
-    const books = Object.entries(markets).map(async mkt => {
-      const book = { symbol: mkt[0], bestAsk: mkt[1].close, bestBid: mkt[1].close };
-      const currentMemory = beholder.getMemory(mkt[0], indexKeys.BOOK);
+      //simulação de book
+      const books = markets.map(mkt => {
+        const book = { symbol: mkt.symbol, bestAsk: mkt.close, bestBid: mkt.close };
+        hydra.updateMemory(mkt.symbol, indexKeys.BOOK, null, book);
+        return book;
+      })
 
-      const newMemory = {};
-      newMemory.previous = currentMemory ? currentMemory.current : book;
-      newMemory.current = book;
+      if (WSS) WSS.broadcast({ book: books });
+      //fim simulação de book
+    } catch (err) {
+      if (logs) logger('M:' + monitorId, err)
+    }
+  })
+  logger('M:' + monitorId, 'Ticker Monitor has started!');
+}
 
-      await beholder.updateMemory(mkt[0], indexKeys.BOOK, null, newMemory);
+let book = [];
+function startBookMonitor(monitorId, broadcastLabel, logs) {
+  if (!anonymousExchange) return new Error('Exchange Monitor not initialized yet.');
+  anonymousExchange.bookStream(async (order) => {
+    if (logs) logger('M:' + monitorId, order);
 
-      return book;
-    })
-    if (WSS) WSS.broadcast({ book: books });
-    //fim da simulação de book
-  });
-  logger('M:' + monitorId, `Mini-Ticker Monitor has started at ${broadcastLabel}`);
+    try {
+      if (book.length === 200) {
+        if (broadcastLabel && WSS) WSS.broadcast({ [broadcastLabel]: book });
+        book = [];
+      }
+      else book.push({ ...order });
+
+      hydra.updateMemory(order.symbol, indexKeys.BOOK, null, order);
+    } catch (err) {
+      if (logs) logger('M:' + monitorId, err);
+    }
+  })
+  logger('M:' + monitorId, 'Book Monitor has started!');
 }
 
 async function loadWallet(settings, user) {
@@ -48,7 +60,7 @@ async function loadWallet(settings, user) {
 
   const info = await exchange.balance();
   const wallet = Object.entries(info).map(async (item) => {
-    const results = await beholder.updateMemory(item[0], `${indexKeys.WALLET}_${user.id}`, null, parseFloat(item[1].available));
+    const results = await hydra.updateMemory(item[0], `${indexKeys.WALLET}_${user.id}`, null, parseFloat(item[1].available));
     if (results) results.map(r => WSS.direct(user.id, { notification: r }));
 
     return {
@@ -103,11 +115,10 @@ async function processExecutionData(userId, monitorId, executionData, broadcastL
 
         notifyOrderUpdate(userId, order);
 
-        const orderCopy = getLightOrder(updatedOrder.get({ plain: true }));
-        const results = await beholder.updateMemory(order.symbol, indexKeys.LAST_ORDER, null, orderCopy);
-        if (results) results.map(r => WSS.direct(userId, { notification: r }));
+        await hydra.updateMemory(order.symbol, `${indexKeys.LAST_ORDER}_${userId}`, null, updatedOrder.get({ plain: true }));
+
         if (broadcastLabel && WSS)
-          WSS.direct(userId, { [broadcastLabel]: orderCopy })
+          WSS.direct(userId, { [broadcastLabel]: order })
       }
     } catch (error) {
       logger(`M:${monitorId}-${userId}`, error);
@@ -148,7 +159,7 @@ async function stopUserDataMonitor(user, monitorId, logs) {
   exchange.terminateUserDataStream();
   if (logs) logger(`M:${monitorId}-${user.id}`, `User Data Monitor ${monitorId}-${user.id} stopped!`);
 
-  beholder.clearWallet(user.id);
+  hydra.clearWallet(user.id);
 }
 
 async function processChartData(monitorId, symbol, indexes, interval, ohlc, logs) {
@@ -165,7 +176,7 @@ async function processChartData(monitorId, symbol, indexes, interval, ohlc, logs
     try {
       const calc = execCalc(indexName, ohlc, ...params);
       if (logs) logger('M:' + monitorId, `${index}_${interval} calculated: ${JSON.stringify(calc.current ? calc.current : calc)}`);
-      beholder.updateMemory(symbol, index, interval, calc, false);
+      hydra.updateMemory(symbol, index, interval, calc, false);
 
       memoryKeys.push(beholder.parseMemoryKey(symbol, index, interval));
     } catch (err) {
@@ -211,8 +222,8 @@ function startChartMonitor(userId, monitorId, symbol, interval, indexes, broadca
     if (logs) logger('M:' + monitorId, lastCandle);
 
     try {
-      beholder.updateMemory(symbol, indexKeys.LAST_CANDLE, interval, { current: lastCandle, previous: previousCandle }, false);
-      beholder.updateMemory(symbol, indexKeys.PREVIOUS_CANDLE, interval, { current: previousCandle, previous: previousPreviousCandle }, false);
+      hydra.updateMemory(symbol, indexKeys.LAST_CANDLE, interval, { current: lastCandle, previous: previousCandle }, false);
+      hydra.updateMemory(symbol, indexKeys.PREVIOUS_CANDLE, interval, { current: previousCandle, previous: previousPreviousCandle }, false);
 
       if (broadcastLabel && WSS) sendMessage(userId, { [broadcastLabel]: lastCandle });
 
@@ -237,39 +248,10 @@ function stopChartMonitor(monitorId, symbol, interval, indexes, logs) {
   anonymousExchange.terminateChartStream(symbol, interval);
   if (logs) logger('M:' + monitorId, `Chart Monitor ${symbol}_${interval} stopped!`);
 
-  beholder.deleteMemory(symbol, indexKeys.LAST_CANDLE, interval);
+  hydra.deleteMemory(symbol, indexKeys.LAST_CANDLE, interval);
 
   if (indexes && Array.isArray(indexes))
-    indexes.map(ix => beholder.deleteMemory(symbol, ix, interval));
-}
-
-function getLightTicker(data) {
-  delete data.eventType;
-  delete data.eventTime;
-  delete data.symbol;
-  delete data.openTime;
-  delete data.closeTime;
-  delete data.firstTradeId;
-  delete data.lastTradeId;
-  delete data.numTrades;
-  delete data.quoteVolume;
-  delete data.closeQty;
-  delete data.bestBidQty;
-  delete data.bestAskQty;
-  delete data.volume;
-
-  data.priceChange = parseFloat(data.priceChange);
-  data.percentChange = parseFloat(data.percentChange);
-  data.averagePrice = parseFloat(data.averagePrice);
-  data.prevClose = parseFloat(data.prevClose);
-  data.high = parseFloat(data.high);
-  data.low = parseFloat(data.low);
-  data.open = parseFloat(data.open);
-  data.close = parseFloat(data.close);
-  data.bestBid = parseFloat(data.bestBid);
-  data.bestAsk = parseFloat(data.bestAsk);
-
-  return data;
+    indexes.map(ix => hydra.deleteMemory(symbol, ix, interval));
 }
 
 function startTickerMonitor(userId, monitorId, symbol, broadcastLabel, logs) {
@@ -280,14 +262,8 @@ function startTickerMonitor(userId, monitorId, symbol, broadcastLabel, logs) {
     if (logs) logger('M:' + monitorId, data);
 
     try {
-      const ticker = getLightTicker({ ...data });
-      const currentMemory = beholder.getMemory(symbol, indexKeys.TICKER);
-
-      const newMemory = {};
-      newMemory.previous = currentMemory ? currentMemory.current : ticker;
-      newMemory.current = ticker;
-
-      await beholder.updateMemory(data.symbol, indexKeys.TICKER, null, newMemory);
+      const results = await hydra.updateMemory(data.symbol, indexKeys.TICKER, null, newMemory);
+      if (results) results.map(r => WSS.direct(userId, { notification: r }));
 
       if (WSS && broadcastLabel) WSS.direct(userId, { [broadcastLabel]: data });
     } catch (err) {
@@ -298,7 +274,6 @@ function startTickerMonitor(userId, monitorId, symbol, broadcastLabel, logs) {
   logger('M:' + monitorId, `Ticker Monitor has started for ${symbol}`)
 }
 
-
 function stopTickerMonitor(monitorId, symbol, logs) {
   if (!symbol) return new Error(`You can't stop a ticker monitor without a symbol`);
   if (!anonymousExchange) return new Error(`Exchange Monitor not initializer yet.`);
@@ -306,7 +281,7 @@ function stopTickerMonitor(monitorId, symbol, logs) {
   anonymousExchange.terminateTickerStream(symbol);
   if (logs) logger('M:' + monitorId, `Ticker Monitor ${symbol} stopped!`);
 
-  beholder.deleteMemory(symbol, indexKeys.TICKER);
+  hydra.deleteMemory(symbol, indexKeys.TICKER);
 }
 
 function sendMessage(userId, jsonObject) {
@@ -324,18 +299,14 @@ function getConnections() {
   return WSS.getConnections();
 }
 
-async function init(settings, users, wssInstance, beholderInstance) {
-  if (!settings || !beholderInstance) return new Error('Exchange Monitor not initialized yet.');
+async function init(settings, users, wssInstance, hydraInstance) {
+  if (!settings || !hydraInstance) return new Error('Exchange Monitor not initialized yet.');
 
   WSS = wssInstance;
-  beholder = beholderInstance;
+  hydra = hydraInstance;
   anonymousExchange = require('./utils/exchange')(settings);
 
   const monitors = await getActiveSystemMonitors();
-  const miniTickerMonitor = monitors.find(m => m.type === monitorTypes.MINI_TICKER);
-
-  if (miniTickerMonitor)
-    startMiniTickerMonitor(miniTickerMonitor.id, miniTickerMonitor.broadcastLabel, miniTickerMonitor.logs);
 
   const userDataMonitor = monitors.find(m => m.type === monitorTypes.USER_DATA);
 
@@ -367,38 +338,13 @@ async function init(settings, users, wssInstance, beholderInstance) {
 
         const lastOrders = await ordersRepository.getLastFilledOrders(user.id);
         await Promise.all(lastOrders.map(async (order) => {
-          const orderCopy = getLightOrder(order.get({ plain: true }));
-          await beholder.updateMemory(order.symbol, `${indexKeys.LAST_ORDER}_${user.id}`, null, orderCopy, false);
+          await hydra.updateMemory(order.symbol, `${indexKeys.LAST_ORDER}_${user.id}`, null, order, false);
         }));
       }, i * (user.monitors.length + 1) * 250)
     }
   }
 
   logger('system', 'App Exchange Monitor is running');
-}
-
-function getLightOrder(order) {
-  const orderCopy = { ...order };
-  delete orderCopy.id;
-  delete orderCopy.symbol;
-  delete orderCopy.automationId;
-  delete orderCopy.orderId;
-  delete orderCopy.clientOrderId;
-  delete orderCopy.transactTime;
-  delete orderCopy.isMaker;
-  delete orderCopy.commission;
-  delete orderCopy.obs;
-  delete orderCopy.automation;
-  delete orderCopy.createdAt;
-  delete orderCopy.updatedAt;
-
-  orderCopy.limitPrice = orderCopy.limitPrice ? parseFloat(orderCopy.limitPrice) : null;
-  orderCopy.stopPrice = orderCopy.stopPrice ? parseFloat(orderCopy.stopPrice) : null;
-  orderCopy.avgPrice = orderCopy.avgPrice ? parseFloat(orderCopy.avgPrice) : null;
-  orderCopy.net = orderCopy.net ? parseFloat(orderCopy.net) : null;
-  orderCopy.quantity = orderCopy.quantity ? parseFloat(orderCopy.quantity) : null;
-  orderCopy.icebergQty = orderCopy.icebergQty ? parseFloat(orderCopy.icebergQty) : null;
-  return orderCopy;
 }
 
 module.exports = {

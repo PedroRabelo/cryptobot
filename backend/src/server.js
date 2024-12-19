@@ -4,7 +4,7 @@ const appWs = require('./app-ws');
 const settingsRepository = require('./repositories/settingsRepository');
 const automationsRepository = require('./repositories/automationsRepository');
 const usersRepository = require('./repositories/usersRepository');
-const beholder = require('./beholder');
+const hydra = require('./hydra');
 const agenda = require('./agenda');
 const logger = require('./utils/logger');
 
@@ -16,11 +16,10 @@ const logger = require('./utils/logger');
   logger('system', 'Initializing the Beholder Brain...');
 
   const users = await usersRepository.getActiveUsers();
-  const automations = await automationsRepository.getActiveAutomations();
-  beholder.init(automations);
+  hydra.init(users);
 
   logger('system', 'Initializing the Beholder Agenda...');
-  agenda.init(automations);
+  agenda.init(users.map(u => { u.automations }));
 
   logger('system', 'Starting the Server Apps...');
   const server = app.listen(process.env.PORT, () => {
@@ -29,7 +28,7 @@ const logger = require('./utils/logger');
 
   const wss = appWs(server);
 
-  await appEm.init(settings, users, wss, beholder);
+  await appEm.init(settings, users, wss, hydra);
 
   // const telegram = require('./utils/telegram');
   // telegram(settings, 'Teste robô telegram');

@@ -12,8 +12,6 @@ module.exports = {
         password: bcrypt.hashSync(process.env.DEFAULT_SETTINGS_PWD),
         apiUrl: 'https://testnet.binance.vision/api',
         streamUrl: 'wss://testnet.binance.vision/ws',
-        accessKey: process.env.DEFAULT_SETTINGS_ACCESS_KEY,
-        secretKey: encrypt(process.env.DEFAULT_SETTINGS_SECRET_KEY),
         createdAt: new Date(),
         updatedAt: new Date()
       }]);

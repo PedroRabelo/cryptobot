@@ -93,10 +93,6 @@ function parseMemoryKey(symbol, index, interval = null) {
 
 async function updateMemory(symbol, index, interval, value, executeAutomations = true) {
 
-  if (value === undefined || value === null) return false;
-  if (value.toJSON) value = value.toJSON();
-  if (value.get) value = value.get({ plain: true });
-
   if (LOCK_MEMORY) return false;
 
   const memoryKey = parseMemoryKey(symbol, index, interval);
@@ -221,10 +217,10 @@ function calcQty(orderTemplate, price, symbol, isIceberg) {
   let asset;
 
   if (orderTemplate.side === 'BUY') {
-    asset = parseFloat(MEMORY[`${symbol.quote}:WALLET`]);
+    asset = parseFloat(MEMORY[`${symbol.quote}:WALLET_${orderTemplate.userId}`]);
     if (!asset) throw new Error(`There is no ${symbol.quote} in you wallet to place a buy.`);
   } else {
-    asset = parseFloat(MEMORY[`${symbol.base}:WALLET`]);
+    asset = parseFloat(MEMORY[`${symbol.base}:WALLET_${orderTemplate.userId}`]);
     if (!asset) throw new Error(`There is no ${symbol.base} in you wallet to place a sell.`);
   }
 
@@ -244,8 +240,8 @@ function calcQty(orderTemplate, price, symbol, isIceberg) {
       newQty = parseFloat(asset) * (multiplier > 1 ? 1 : multiplier);
   } else if (orderTemplate.quantity === 'MIN_NOTIONAL') {
     newQty = (parseFloat(symbol.minNotional) / parseFloat(price)) * (multiplier < 1 ? 1 : multiplier);
-  } else if (orderTemplate.quantity === 'LAST_ORDER_QTY') {
-    const lastOrder = MEMORY[`${orderTemplate.symbol}:LAST_ORDER`];
+  } else if (orderTemplate.quantity === 'LAST_ORDER_QTY_${orderTemplate.userId}') {
+    const lastOrder = MEMORY[`${orderTemplate.symbol}:LAST_ORDER_${orderTemplate.userId}`];
     if (!lastOrder)
       throw new Error(`There is no last order to use as qty reference for ${orderTemplate.symbol}`);
 
@@ -257,17 +253,17 @@ function calcQty(orderTemplate, price, symbol, isIceberg) {
   return (factor * stepSize).toFixed(symbol.basePrecision);
 }
 
-function hasEnoughAssets(symbol, order, price) {
+function hasEnoughAssets(userId, symbol, order, price) {
   const qty = order.type === 'ICEBERG' ? parseFloat(order.options.icebergQty) : parseFloat(order.quantity);
   if (order.side === 'BUY') {
-    return parseFloat(MEMORY[`${symbol.quote}:WALLET`]) >= (price * qty);
+    return parseFloat(MEMORY[`${symbol.quote}:WALLET_${userId}`]) >= (price * qty);
   } else {
-    return parseFloat(MEMORY[`${symbol.base}:WALLET`]) >= qty;
+    return parseFloat(MEMORY[`${symbol.base}:WALLET_${userId}`]) >= qty;
   }
 }
 
-async function placeOrder(settings, automation, action) {
-  if (!settings || !automation || !action)
+async function placeOrder(settings, user, automation, action) {
+  if (!settings || !user || !automation || !action)
     throw new Error(`All parameters are required to place an order`);
 
   if (!action.orderTemplateId)
@@ -321,11 +317,11 @@ async function placeOrder(settings, automation, action) {
     order.options.stopPrice = stopPrice;
   }
 
-  if (!hasEnoughAssets(symbol, order, price))
+  if (!hasEnoughAssets(user.id, symbol, order, price))
     throw new Error(`You wanna ${order.side} ${order.quantity} ${order.symbol} but you haven't enough assets`);
 
   let result;
-  const exchange = require('./utils/exchange')(settings);
+  const exchange = require('./utils/exchange')(settings, user);
 
   try {
 
@@ -342,6 +338,7 @@ async function placeOrder(settings, automation, action) {
   const savedOrder = await insertOrder({
     automationId: automation.id,
     symbol: order.symbol,
+    userId: user.id,
     quantity: order.quantity,
     type: order.options.type,
     side: order.side,
@@ -356,7 +353,7 @@ async function placeOrder(settings, automation, action) {
 
   if (automation.logs) logger('A:' + automation.id, savedOrder.get({ plain: true }));
 
-  return { type: 'success', text: `Order #${result.orderId} placed with status ${result.status}` }
+  return { type: 'success', text: `Order #${savedOrder.side} ${savedOrder.symbol} ${savedOrder.status}` }
 }
 
 async function generateGrids(automation, levels, quantity, transaction) {
@@ -452,7 +449,7 @@ async function generateGrids(automation, levels, quantity, transaction) {
   return gridsRepository.insertGrids(grids, transaction);
 }
 
-async function gridEval(settings, automation) {
+async function gridEval(settings, user, automation) {
   automation.grids = automation.grids.sort((a, b) => a.id - b.id);
 
   if (LOGS)
@@ -470,13 +467,13 @@ async function gridEval(settings, automation) {
     const book = MEMORY[`${automation.symbol}:BOOK`];
     if (!book) return { type: 'error', text: `No book info for ${automation.symbol}` };
 
-    const result = await placeOrder(settings, automation, automation.actions[0]);
-    if (automation.logs) await require('./utils/telegram')(settings, result.text);
+    const result = await placeOrder(settings, user, automation, automation.actions[0]);
+    if (automation.logs && user.telegramChat) await require('./utils/telegram')(settings, result.text, user.telegramChat);
     if (result.type === 'error') return result;
 
     const transaction = await db.transaction();
     try {
-      const orderTemplate = await orderTemplatesRepository.getOrderTemplate(grid.orderTemplateId);
+      const orderTemplate = await orderTemplatesRepository.getOrderTemplate(user.id, grid.orderTemplateId);
       await generateGrids(automation, automation.grids.length + 1, orderTemplate.quantity, transaction);
       await transaction.commit();
     } catch {
@@ -492,8 +489,8 @@ async function gridEval(settings, automation) {
   }
 }
 
-async function withdrawCrypto(settings, automation, action) {
-  if (!settings || !automation || !action)
+async function withdrawCrypto(settings, user, automation, action) {
+  if (!settings || !automation || !action || !user)
     throw new Error(`All parameters are required to place an order`);
 
   if (!action.withdrawTemplateId)
@@ -504,19 +501,19 @@ async function withdrawCrypto(settings, automation, action) {
   let amount = parseFloat(withdrawTemplate.amount);
   if (!amount) {
     if (withdrawTemplate.amount === 'MAX_WALLET') {
-      const available = MEMORY[`${withdrawTemplate.coin}:WALLET`];
+      const available = MEMORY[`${withdrawTemplate.coin}:WALLET_${user.id}`];
       if (!available) throw new Error(`No available funds for this coin.`);
 
       amount = available * (withdrawTemplate.amountMultiplier > 1 ? 1 : withdrawTemplate.amountMultiplier);
     } else if (withdrawTemplate.amount === 'LAST_ORDER_QTY') {
-      const keys = searchMemory(new RegExp(`^((${withdrawTemplate.coin}.+|.+${withdrawTemplate.coin}):LAST_ORDER)$`));
+      const keys = searchMemory(new RegExp(`^((${withdrawTemplate.coin}.+|.+${withdrawTemplate.coin}):LAST_ORDER_${user.id})$`));
       if (!keys || !keys.length) throw new Error(`No Last order for this coin.`);
 
       amount = keys[keys.length - 1].value.quantity * withdrawTemplate.amountMultiplier;
     }
   }
 
-  const exchange = require('./utils/exchange')(settings);
+  const exchange = require('./utils/exchange')(settings, user);
 
   try {
     const result = await exchange.withdraw(withdrawTemplate.coin, amount, withdrawTemplate.address, withdrawTemplate.network, withdrawTemplate.addressTag);
@@ -588,8 +585,8 @@ function doAction(settings, user, action, automation) {
       case actionsTypes.ALERT_TELEGRAM: return sendTelegram(settings, user, automation);
       case actionsTypes.ORDER: return placeOrder(settings, automation, action);
       case actionsTypes.TRAILING: return trailingEval(settings, automation, action);
-      case actionsTypes.WITHDRAW: return withdrawCrypto(settings, automation, action);
-      case actionsTypes.GRID: return gridEval(settings, automation);
+      case actionsTypes.WITHDRAW: return withdrawCrypto(settings, user, automation, action);
+      case actionsTypes.GRID: return gridEval(settings, user, automation);
     }
   } catch (err) {
     if (automation.logs) {
@@ -662,10 +659,8 @@ function findAutomations(memoryKey) {
   return [...new Set(ids)].map(id => BRAIN[id]);
 }
 
-function deleteMemory(symbol, index, interval) {
+function deleteMemory(memoryKey) {
   try {
-    const indexKey = interval ? `${index}_${interval}` : index;
-    const memoryKey = `${symbol}:${indexKey}`;
     if (MEMORY[memoryKey] === undefined) return;
 
     LOCK_MEMORY = true;
@@ -823,11 +818,6 @@ function searchMemory() {
   });
 }
 
-function clearWallet(userId) {
-  const balances = searchMemory(new RegExp(`^(.+:WALLET_${userId})$`));
-  balances.map(b => delete MEMORY[b.key]);
-}
-
 module.exports = {
   updateMemory,
   deleteMemory,
@@ -843,6 +833,5 @@ module.exports = {
   generateGrids,
   evalDecision,
   searchMemory,
-  parseMemoryKey,
-  clearWallet
+  parseMemoryKey
 }
