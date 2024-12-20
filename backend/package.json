@@ -29,6 +29,7 @@
     "node-binance-api": "^0.12.5",
     "node-schedule": "^2.1.1",
     "pg": "^8.11.5",
+    "redis": "^4.7.0",
     "sequelize": "^6.37.2",
     "technicalindicators": "^3.1.0",
     "telegraf": "^4.16.3",

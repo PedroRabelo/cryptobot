@@ -2,7 +2,6 @@ const app = require('./app');
 const appEm = require('./app-em');
 const appWs = require('./app-ws');
 const settingsRepository = require('./repositories/settingsRepository');
-const automationsRepository = require('./repositories/automationsRepository');
 const usersRepository = require('./repositories/usersRepository');
 const hydra = require('./hydra');
 const agenda = require('./agenda');

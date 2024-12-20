@@ -1,6 +1,6 @@
-const { getAutomations } = require('../repositories/automationsRepository');
 const { getActiveUserMonitors } = require('../repositories/monitorsRepository');
-const beholder = require('../beholder');
+const { getActiveUsers } = require('../repositories/usersRepository');
+const hydra = require('../hydra');
 const indexes = require('../utils/indexes');
 const agenda = require('../agenda');
 
@@ -11,7 +11,7 @@ function getMemory(req, res, next) {
   if (USER_VARIABLES.includes(index))
     index = `${index}_${res.locals.token.id}`;
 
-  res.json(beholder.getMemory(symbol, index, interval));
+  res.json(hydra.getMemory(symbol, index, interval));
 }
 
 async function getMemoryIndexes(req, res, next) {
@@ -20,17 +20,17 @@ async function getMemoryIndexes(req, res, next) {
   const userIndexes = monitors.map(m => m.indexes.split(',')).flat();
   userIndexes.push(indexes.indexKeys.LAST_CANDLE, indexes.indexKeys.BOOK, indexes.indexKeys.MINI_TICKER, `${indexes.indexKeys.WALLET}_${userId}`, `${indexes.indexKeys.LAST_ORDER}_${userId}`)
 
-  let memory = beholder.getMemoryIndexes();
+  let memory = hydra.getMemoryIndexes();
   memory = userIndexes.map(uix => memory.filter(m => new RegExp(`^(${uix}(\.|$))`).test(m.variable))).flat();
   res.json(memory);
 }
 
 function getBrain(req, res, next) {
-  res.json(beholder.getBrain());
+  res.json(hydra.getBrain());
 }
 
 function getBrainIndexes(req, res, next) {
-  res.json(beholder.getBrainIndexes());
+  res.json(hydra.getBrainIndexes());
 }
 
 function getAnalysisIndexes(req, res, next) {
@@ -47,9 +47,9 @@ async function getStreams(req, res, next) {
 }
 
 async function init(req, res, next) {
-  const automations = await getAutomations();
-  beholder.init(automations);
-  res.json(beholder.getBrain());
+  const users = await getActiveUsers();
+  hydra.init(users);
+  res.json(hydra.getBrain());
 }
 
 module.exports = {

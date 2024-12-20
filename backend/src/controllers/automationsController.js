@@ -4,7 +4,7 @@ const gridsRepository = require('../repositories/gridsRepository');
 const orderTemplatesRepository = require('../repositories/orderTemplatesRepository');
 const ordersRepository = require('../repositories/ordersRepository');
 const usersRepository = require('../repositories/usersRepository');
-const beholder = require('../beholder');
+const hydra = require('../hydra');
 const agenda = require('../agenda');
 const db = require('../db');
 const logger = require('../utils/logger');
@@ -31,7 +31,7 @@ async function startAutomation(req, res, next) {
     }
   }
   else
-    beholder.updateBrain(automation.get({ plain: true }));
+    hydra.updateBrain(automation.get({ plain: true }));
 
   await automation.save();
 
@@ -52,9 +52,9 @@ async function stopAutomation(req, res, next) {
   if (automation.schedule)
     agenda.cancelSchedule(automation.id);
   else
-    beholder.deleteBrain(automation.get({ plain: true }));
+    hydra.deleteBrain(automation.get({ plain: true }));
 
-  beholder.deleteBrain(automation.get({ plain: true }));
+  hydra.deleteBrain(automation.get({ plain: true }));
   await automation.save();
 
   if (automation.logs) logger('A:' + automation.id, `Automation ${automation.name} has stopped!`);
@@ -119,7 +119,7 @@ async function insertAutomation(req, res, next) {
     actions = await actionsRepository.insertActions(actions, transaction);
 
     if (isGrid)
-      grids = await beholder.generateGrids(savedAutomation, levels, quantity, transaction);
+      grids = await hydra.generateGrids(savedAutomation, levels, quantity, transaction);
 
     await transaction.commit();
   } catch (err) {
@@ -134,7 +134,7 @@ async function insertAutomation(req, res, next) {
     if (savedAutomation.schedule) {
       agenda.addSchedule(savedAutomation.get({ plain: true }));
     } else {
-      beholder.updateBrain(savedAutomation.get({ plain: true }));
+      hydra.updateBrain(savedAutomation.get({ plain: true }));
     }
   }
 
@@ -175,7 +175,7 @@ async function updateAutomation(req, res, next) {
     updatedAutomation = await automationsRepository.updateAutomation(id, newAutomation);
 
     if (isGrid) {
-      await beholder.generateGrids(updatedAutomation, levels, quantity, transaction);
+      await hydra.generateGrids(updatedAutomation, levels, quantity, transaction);
     } else {
       await actionsRepository.deleteActions(id, transaction);
       actions = await actionsRepository.insertActions(actions, transaction);
@@ -195,14 +195,14 @@ async function updateAutomation(req, res, next) {
       agenda.cancelSchedule(updatedAutomation.id);
       agenda.addSchedule(updatedAutomation.get({ plain: true }));
     } else {
-      beholder.deleteBrain(currentAutomation);
-      beholder.updateBrain(updatedAutomation.get({ plain: true }));
+      hydra.deleteBrain(currentAutomation);
+      hydra.updateBrain(updatedAutomation.get({ plain: true }));
     }
   } else {
     if (updatedAutomation.schedule) {
       agenda.cancelSchedule(updatedAutomation.id);
     } else {
-      beholder.deleteBrain(currentAutomation);
+      hydra.deleteBrain(currentAutomation);
     }
   }
 
@@ -219,7 +219,7 @@ async function deleteAutomation(req, res, next) {
     if (currentAutomation.schedule)
       agenda.cancelSchedule(currentAutomation.id);
     else
-      beholder.deleteBrain(currentAutomation);
+      hydra.deleteBrain(currentAutomation);
   }
 
   const transaction = db.transaction();

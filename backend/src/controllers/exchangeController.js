@@ -3,7 +3,7 @@ const withdrawTemplatesRepository = require('../repositories/withdrawTemplatesRe
 const ordersRepository = require('../repositories/ordersRepository');
 const symbolsRepository = require('../repositories/symbolsRepository');
 const usersRepository = require('../repositories/usersRepository');
-const beholder = require('../beholder');
+const hydra = require('../hydra');
 
 async function loadBalance(userId, fiat) {
   const user = await usersRepository.getUserDecrypted(userId);
@@ -18,10 +18,10 @@ async function loadBalance(userId, fiat) {
   let total = 0;
   await Promise.all(coins.map(async (coin) => {
     let available = parseFloat(info[coin].available);
-    if (available > 0) available = beholder.tryFiatConversion(coin, available, fiat);
+    if (available > 0) available = hydra.tryFiatConversion(coin, available, fiat);
 
     let onOrder = parseFloat(info[coin].onOrder);
-    if (onOrder > 0) onOrder = beholder.tryFiatConversion(coin, onOrder);
+    if (onOrder > 0) onOrder = hydra.tryFiatConversion(coin, onOrder);
 
     info[coin].fiatEstimate = available + onOrder;
     total += available + onOrder;
@@ -66,8 +66,8 @@ async function getFullBalance(req, res, next) {
       const symbol = symbolsObj[averageObj.symbol];
 
       if (symbol.quote !== fiat) {
-        averageObj.avg = beholder.tryFiatConversion(symbol.quote, parseFloat(averageObj.avg), fiat);
-        averageObj.net = beholder.tryFiatConversion(symbol.quote, parseFloat(averageObj.net), fiat);
+        averageObj.avg = hydra.tryFiatConversion(symbol.quote, parseFloat(averageObj.avg), fiat);
+        averageObj.net = hydra.tryFiatConversion(symbol.quote, parseFloat(averageObj.net), fiat);
       }
       averageObj.symbol = symbol.base;
 
@@ -110,13 +110,13 @@ async function doWithdraw(req, res, next) {
   let amount = parseFloat(withdrawTemplate.amount);
   if (!amount) {
     if (withdrawTemplate.amount === 'MAX_WALLET') {
-      const available = beholder.getMemory(withdrawTemplate.coin, `WALLET_${userId}`, null);
+      const available = hydra.getMemory(withdrawTemplate.coin, `WALLET_${userId}`, null);
       if (!available) return res.status(400).json(`No available funds for this coin.`);
 
       amount = available * (withdrawTemplate.amountMultiplier > 1 ? 1 : withdrawTemplate.amountMultiplier);
 
     } else if (withdrawTemplate.amount === 'LAST_ORDER_QTY') {
-      const keys = beholder.searchMemory(new RegExp(`^((${withdrawTemplate.coin}.+|.+${withdrawTemplate.coin}):LAST_ORDER_${userId})$`));
+      const keys = hydra.searchMemory(new RegExp(`^((${withdrawTemplate.coin}.+|.+${withdrawTemplate.coin}):LAST_ORDER_${userId})$`));
       if (!keys || !keys.length) return res.status(400).json(`No Last order for this coin.`);
 
       amount = keys[keys.length - 1].value.quantity * withdrawTemplate.amountMultiplier;

@@ -189,10 +189,10 @@ function calcPrice(orderTemplate, symbol, isStopPrice) {
     try {
       if (!stopPrice) {
         if (parseFloat(orderTemplate.limitPrice)) return orderTemplate.limitPrice;
-        newPrice = eval(getEval(orderTemplate.limitPrice)) * orderTemplate.limitPriceMultiplier;
+        newPrice = Function("MEMORY", "return" + getEval(orderTemplate.limitPrice))(MEMORY) * orderTemplate.limitPriceMultiplier;
       } else {
         if (parseFloat(orderTemplate.stopPrice)) return orderTemplate.stopPrice;
-        newPrice = eval(getEval(orderTemplate.stopPrice)) * orderTemplate.stopPriceMultiplier;
+        newPrice = Function("MEMORY", "return" + getEval(orderTemplate.stopPrice))(MEMORY) * orderTemplate.stopPriceMultiplier;
       }
     } catch (error) {
       if (isStopPrice)
@@ -457,7 +457,7 @@ async function gridEval(settings, user, automation) {
 
   for (let i = 0; i < automation.grids.length; i++) {
     const grid = automation.grids[i];
-    if (!eval(grid.conditions)) continue;
+    if (!Function("MEMORY", "return" + eval(grid.conditions))(MEMORY)) continue;
 
     if (automation.logs)
       logger('A:' + automation.id, `Beholder evaluated a condition at ${automation.name} => ${grid.conditions}`);
@@ -612,7 +612,7 @@ async function evalDecision(memoryKey, automation) {
 
       if (LOGS) logger('A:' + automation.id, `Beholder is trying to evaluate a condition ${evalCondition}\n at automation ${automation.name}`);
 
-      const isValid = evalCondition ? eval(evalCondition) : true;
+      const isValid = evalCondition ? Function("MEMORY", "return " + evalCondition)(MEMORY) : true;
       if (!isValid) return false;
     }
 
@@ -696,40 +696,11 @@ function deleteBrain(automation) {
   }
 }
 
-function getMemory(symbol, index, interval) {
-  if (symbol && index) {
-    const indexKey = interval ? `${index}_${interval}` : index;
-    const memoryKey = `${symbol}:${indexKey}`;
-
-    const result = MEMORY[memoryKey];
-    return typeof result === 'object' ? { ...result } : result;
-  }
+function getMemory(memoryKey) {
+  if (memoryKey)
+    return { ...MEMORY };
 
   return { ...MEMORY };
-}
-
-function getBrainIndexes() {
-  return { ...BRAIN_INDEX };
-}
-
-function flattenObject(obj) {
-  let toReturn = {};
-
-  for (let i in obj) {
-    if (!obj.hasOwnProperty(i)) continue;
-
-    if ((typeof obj[i]) === 'object' && obj[i] !== null) {
-      let flatObject = flattenObject(obj[i]);
-      for (let x in flattenObject) {
-        if (!flatObject.hasOwnProperty(x)) continue;
-        toReturn[i + '.' + x] = flatObject[x];
-      }
-    } else {
-      toReturn[i] = obj[i];
-    }
-  }
-
-  return toReturn;
 }
 
 function getEval(prop) {
@@ -739,75 +710,6 @@ function getEval(prop) {
   const memKey = propSplit[0];
   const memProp = prop.replace(memKey, '');
   return `MEMORY['${memKey}${memProp}']`;
-}
-
-function getMemoryIndexes() {
-  return Object.entries(flattenObject(MEMORY)).map(prop => {
-    if (prop[0].indexOf('previous') !== -1) return false;
-    const propSplit = prop[0].split(':');
-    return {
-      symbol: propSplit[0],
-      variable: propSplit[1].replace('.current', ''),
-      eval: getEval(prop[0]),
-      example: propSplit[1]
-    }
-  })
-    .filter(ix => ix)
-    .sort((a, b) => {
-      if (a.variable < b.variable) return -1;
-      if (a.variable > b.variable) return 1;
-      return 0;
-    });
-}
-
-function getBrain() {
-  return { ...BRAIN };
-}
-
-const DOLLAR_COINS = ['USD', 'USDT', 'USDC', 'BUSD'];
-
-function getStableConversion(baseAsset, quoteAsset, baseQty) {
-  if (DOLLAR_COINS.includes(baseAsset)) return baseQty;
-
-  const book = getMemory(baseAsset + quoteAsset, 'BOOK', null);
-  if (book) return parseFloat(baseQty) * book.current.bestBid;
-  return 0;
-}
-
-const FIAT_COINS = ['BRL', 'EUR', 'GBP'];
-
-function getFiatConversion(stableCoin, fiatCoin, fiatQty) {
-  const book = getMemory(stableCoin + fiatCoin, 'BOOK', null);
-  if (book) return parseFloat(fiatQty) / book.current.bestBid;
-  return 0;
-}
-
-function tryUSDConversion(baseAsset, baseQty) {
-  if (DOLLAR_COINS.includes(baseAsset)) return baseQty;
-  if (FIAT_COINS.includes(baseAsset)) return getFiatConversion('USDT', baseAsset, baseQty);
-
-  for (let i = 0; i < DOLLAR_COINS.length; i++) {
-    const converted = getStableConversion(baseAsset, DOLLAR_COINS[i], baseQty);
-    if (converted > 0) return converted;
-  }
-
-  return 0;
-}
-
-function tryFiatConversion(baseAsset, baseQty, fiat) {
-  if (fiat) fiat = fiat.toUpperCase();
-  if (FIAT_COINS.includes(baseAsset) && baseAsset === fiat) return baseQty;
-
-  const usd = tryUSDConversion(baseAsset, baseQty);
-  if (fiat === 'USD' || !fiat) return usd;
-
-  let book = getMemory('USDT' + fiat, 'BOOK');
-  if (book) usd * book.current.bestBid;
-
-  book = getMemory(fiat + 'USDT', 'BOOK');
-  if (book) return usd / book.current.bestBid;
-
-  return usd;
 }
 
 function searchMemory() {
@@ -821,15 +723,11 @@ function searchMemory() {
 module.exports = {
   updateMemory,
   deleteMemory,
-  getMemoryIndexes,
   getMemory,
-  getBrain,
   updateBrain,
-  getBrainIndexes,
   deleteBrain,
   init,
   placeOrder,
-  tryFiatConversion,
   generateGrids,
   evalDecision,
   searchMemory,

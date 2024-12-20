@@ -15,7 +15,8 @@ const email = require('../utils/email');
 const sms = require('../utils/sms');
 const telegram = require('../utils/telegram');
 const crypto = require('../utils/crypto');
-const agenda = require('../agenda')
+const agenda = require('../agenda');
+const hydra = require('../hydra');
 
 async function getUsers(req, res, next) {
   const page = req.query.page;
@@ -94,7 +95,7 @@ async function stopUserAutomations(user) {
     if (automation.schedule)
       agenda.cancelSchedule(automation.id);
     else
-      beholder.deleteBrain(automation.get({ plain: true }));
+      hydra.deleteBrain(automation.get({ plain: true }));
 
     await automationsRepository.updateAutomation(automation.id, { isActive: false });
 

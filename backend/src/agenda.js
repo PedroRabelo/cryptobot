@@ -1,5 +1,5 @@
 const nodeSchedule = require('node-schedule');
-const beholder = require('./beholder');
+const hydra = require('./hydra');
 const automationRepository = require('./repositories/automationsRepository');
 const logger = require('./utils/logger');
 
@@ -25,7 +25,7 @@ function verifyCron(schedule) {
 async function runSchedule(id) {
   try {
     const automation = await automationRepository.getAutomation(id);
-    let result = await beholder.evalDecision('', automation);
+    let result = await hydra.evalDecision('', automation);
     result = result.filter(r => r);
     if (LOGS || automation.logs) logger('A:' + id, `The Scheduled Automation #${id} has fired at ${new Date()}.\nResult: ${JSON.stringify(result)}`);
   } catch (err) {

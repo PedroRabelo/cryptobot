@@ -4,7 +4,7 @@ const orderTemplatesRepository = require('../repositories/orderTemplatesReposito
 const automationRepository = require('../repositories/automationsRepository');
 const actionsRepository = require('../repositories/actionsRepository');
 const usersRepository = require('../repositories/usersRepository');
-const beholder = require('../beholder');
+const hydra = require('../hydra');
 const logger = require('../utils/logger');
 const db = require('../db');
 const appEm = require('../app-em');
@@ -93,7 +93,7 @@ async function getDayTradeReport(req, res, next) {
   if ((endDate - startDate) > (1 * 24 * 60 * 60 * 1000)) startDate = getStartToday();
 
   const orders = await ordersRepository.getReportOrders(userId, quote, startDate, endDate);
-  const wallet = beholder.getMemory(quote, 'WALLET');
+  const wallet = hydra.getMemory(quote, 'WALLET_' + userId);
 
   if (!orders || !orders.length) return res.json({ ...EMPTY_REPORT, quote, startDate, endDate });
 
@@ -146,7 +146,7 @@ async function getMonthReport(req, res, next) {
   if ((endDate - startDate) > (31 * 24 * 60 * 60 * 1000)) startDate = thirtyDaysAgo();
 
   const orders = await ordersRepository.getReportOrders(userId, quote, startDate, endDate);
-  const wallet = beholder.getMemory(quote, 'WALLET');
+  const wallet = hydra.getMemory(quote, 'WALLET_' + userId);
 
   if (!orders || !orders.length) return res.json({ ...EMPTY_REPORT, quote, startDate, endDate });
 
