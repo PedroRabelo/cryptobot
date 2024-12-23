@@ -9,23 +9,20 @@ const { STOP_TYPES, LIMIT_TYPES, insertOrder } = require('./repositories/ordersR
 const db = require('./db');
 const logger = require('./utils/logger');
 
-const MEMORY = {}
+const Cache = require('./utils/cache');
+const cache = new Cache();
 
 let BRAIN = {}
 let BRAIN_INDEX = {}
 
-let LOCK_MEMORY = false;
-
 let LOCK_BRAIN = false;
 
 const INTERVAL = parseInt(process.env.AUTOMATION_INTERVAL || 0);
-
 const LOGS = process.env.BEHOLDER_LOGS === 'true';
 
 function init(automations) {
   try {
     LOCK_BRAIN = true;
-    LOCK_MEMORY = true;
 
     BRAIN = {};
     BRAIN_INDEX = {};
@@ -37,7 +34,6 @@ function init(automations) {
 
   } finally {
     LOCK_BRAIN = false;
-    LOCK_MEMORY = false;
     logger('beholder', 'Beholder Brain has started!');
   }
 }
@@ -91,14 +87,7 @@ function parseMemoryKey(symbol, index, interval = null) {
   return `${symbol}:${indexKey}`;
 }
 
-async function updateMemory(symbol, index, interval, value, executeAutomations = true) {
-
-  if (LOCK_MEMORY) return false;
-
-  const memoryKey = parseMemoryKey(symbol, index, interval);
-  MEMORY[memoryKey] = value;
-
-  if (LOGS) logger('beholder', `Beholder memory updated: ${memoryKey} => ${JSON.stringify(value)}`);
+async function updatedMemory(memoryKey) {
 
   if (LOCK_BRAIN) {
     if (LOGS) logger('beholder', `Beholder brain is locked, sorry`);
@@ -181,7 +170,7 @@ async function sendTelegram(settings, user, automation) {
   return { type: 'success', text: `Telegram message sent from automation ${automation.name}!` };
 }
 
-function calcPrice(orderTemplate, symbol, isStopPrice) {
+async function calcPrice(orderTemplate, symbol, isStopPrice) {
   const tickSize = parseFloat(symbol.tickSize);
   let newPrice, factor;
 
@@ -201,7 +190,7 @@ function calcPrice(orderTemplate, symbol, isStopPrice) {
         throw new Error(`Error trying to calc Limite Price with params; ${orderTemplate.limitPrice} x ${orderTemplate.limitPriceMultiplier}. Error: ${err.message}`);
     }
   } else {
-    const memory = MEMORY[`${orderTemplate.symbol}:BOOK`];
+    const memory = await cache.get(`${orderTemplate.symbol}:BOOK`);
     if (!memory)
       throw new Error(`Error trying to get market price. OTID: ${orderTemplate.id}, ${isStopPrice}. No book`);
 
@@ -213,14 +202,14 @@ function calcPrice(orderTemplate, symbol, isStopPrice) {
   return (factor * tickSize).toFixed(symbol.quotePrecision);
 }
 
-function calcQty(orderTemplate, price, symbol, isIceberg) {
+async function calcQty(orderTemplate, price, symbol, isIceberg) {
   let asset;
 
   if (orderTemplate.side === 'BUY') {
-    asset = parseFloat(MEMORY[`${symbol.quote}:WALLET_${orderTemplate.userId}`]);
+    asset = parseFloat(await cache.get(`${symbol.quote}:WALLET_${orderTemplate.userId}`));
     if (!asset) throw new Error(`There is no ${symbol.quote} in you wallet to place a buy.`);
   } else {
-    asset = parseFloat(MEMORY[`${symbol.base}:WALLET_${orderTemplate.userId}`]);
+    asset = parseFloat(await cache(`${symbol.base}:WALLET_${orderTemplate.userId}`));
     if (!asset) throw new Error(`There is no ${symbol.base} in you wallet to place a sell.`);
   }
 
@@ -241,7 +230,7 @@ function calcQty(orderTemplate, price, symbol, isIceberg) {
   } else if (orderTemplate.quantity === 'MIN_NOTIONAL') {
     newQty = (parseFloat(symbol.minNotional) / parseFloat(price)) * (multiplier < 1 ? 1 : multiplier);
   } else if (orderTemplate.quantity === 'LAST_ORDER_QTY_${orderTemplate.userId}') {
-    const lastOrder = MEMORY[`${orderTemplate.symbol}:LAST_ORDER_${orderTemplate.userId}`];
+    const lastOrder = await cache.get(`${orderTemplate.symbol}:LAST_ORDER_${orderTemplate.userId}`);
     if (!lastOrder)
       throw new Error(`There is no last order to use as qty reference for ${orderTemplate.symbol}`);
 
@@ -253,12 +242,12 @@ function calcQty(orderTemplate, price, symbol, isIceberg) {
   return (factor * stepSize).toFixed(symbol.basePrecision);
 }
 
-function hasEnoughAssets(userId, symbol, order, price) {
+async function hasEnoughAssets(userId, symbol, order, price) {
   const qty = order.type === 'ICEBERG' ? parseFloat(order.options.icebergQty) : parseFloat(order.quantity);
   if (order.side === 'BUY') {
-    return parseFloat(MEMORY[`${symbol.quote}:WALLET_${userId}`]) >= (price * qty);
+    return parseFloat(await cache.get(`${symbol.quote}:WALLET_${userId}`)) >= (price * qty);
   } else {
-    return parseFloat(MEMORY[`${symbol.base}:WALLET_${userId}`]) >= qty;
+    return parseFloat(await cache.get(`${symbol.base}:WALLET_${userId}`)) >= qty;
   }
 }
 
@@ -285,7 +274,7 @@ async function placeOrder(settings, user, automation, action) {
     }
   }
 
-  const price = calcPrice(orderTemplate, symbol, false);
+  const price = await calcPrice(orderTemplate, symbol, false);
 
   if (!isFinite(price) || !price)
     throw new Error(`Error in calcPrice function, params: OTID ${orderTemplate.id}, $: ${price}, stop: false`);
@@ -293,7 +282,7 @@ async function placeOrder(settings, user, automation, action) {
   if (LIMIT_TYPES.includes(order.options.type))
     order.limitPrice = price;
 
-  const quantity = calcQty(orderTemplate, price, symbol, false);
+  const quantity = await calcQty(orderTemplate, price, symbol, false);
 
   if (!isFinite(quantity) || !quantity)
     throw new Error(`Error in calcQty function, params: OTID ${orderTemplate.id}, $: ${price}, iceberg: false`);
@@ -301,7 +290,7 @@ async function placeOrder(settings, user, automation, action) {
   order.quantity = quantity;
 
   if (order.options.type === 'ICEBERG') {
-    const icebergQty = calcQty(orderTemplate, price, symbol, true);
+    const icebergQty = await calcQty(orderTemplate, price, symbol, true);
 
     if (!isFinite(icebergQty) || !icebergQty)
       throw new Error(`Error in calcQty function, params: OTID ${orderTemplate.id}, $: ${price}, iceberg: true`);
@@ -309,7 +298,7 @@ async function placeOrder(settings, user, automation, action) {
     order.options.icebergQty = icebergQty;
   }
   else if (STOP_TYPES.includes(order.options.type)) {
-    const stopPrice = calcPrice(orderTemplate, symbol, true);
+    const stopPrice = await calcPrice(orderTemplate, symbol, true);
 
     if (!isFinite(stopPrice) || !stopPrice)
       throw new Error(`Error in calcPrice function, params: OTID ${orderTemplate.id}, $: ${stopPrice}, stop: true`);
@@ -317,7 +306,8 @@ async function placeOrder(settings, user, automation, action) {
     order.options.stopPrice = stopPrice;
   }
 
-  if (!hasEnoughAssets(user.id, symbol, order, price))
+  const hasEnough = await hasEnoughAssets(user.id, symbol, order, price);
+  if (!hasEnough)
     throw new Error(`You wanna ${order.side} ${order.quantity} ${order.symbol} but you haven't enough assets`);
 
   let result;
@@ -415,7 +405,7 @@ async function generateGrids(automation, levels, quantity, transaction) {
       icebergQtyMultiplier: 1
     }, transaction)
 
-  const currentPrice = parseFloat(MEMORY[`${automation.symbol}:BOOK`].current.bestAsk);
+  const currentPrice = parseFloat(await cache.get(`${automation.symbol}:BOOK`).current.bestAsk);
   const differences = [];
 
   for (let i = 1; i <= levels; i++) {
@@ -598,12 +588,14 @@ function doAction(settings, user, action, automation) {
 }
 
 async function evalDecision(memoryKey, automation) {
-  if (!automation) return false;
+  if (!automation && !automation.indexes) return false;
 
   try {
     const indexes = automation.indexes ? automation.indexes.split(',') : [];
 
     if (indexes.length) {
+      const MEMORY = await cache.getAll(...indexes);
+
       const isChecked = indexes.every(ix => MEMORY[ix] !== null && MEMORY[ix] !== undefined);
       if (!isChecked) return false;
 
@@ -659,19 +651,6 @@ function findAutomations(memoryKey) {
   return [...new Set(ids)].map(id => BRAIN[id]);
 }
 
-function deleteMemory(memoryKey) {
-  try {
-    if (MEMORY[memoryKey] === undefined) return;
-
-    LOCK_MEMORY = true;
-    delete MEMORY[memoryKey];
-
-    if (LOGS) logger('beholder', `Beholder memory delete: ${memoryKey}`);
-  } finally {
-    LOCK_MEMORY = false;
-  }
-}
-
 function deleteBrainIndex(indexes, automationId) {
   if (typeof indexes === 'string') indexes = indexes.split(',');
 
@@ -721,8 +700,6 @@ function searchMemory() {
 }
 
 module.exports = {
-  updateMemory,
-  deleteMemory,
   getMemory,
   updateBrain,
   deleteBrain,

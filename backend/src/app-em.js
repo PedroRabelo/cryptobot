@@ -5,34 +5,6 @@ const logger = require('./utils/logger');
 
 let WSS, hydra, anonymousExchange;
 
-function startTickerMonitor(monitorId, broadcastLabel, logs) {
-  if (!anonymousExchange) return new Error('Exchange Monitor not initialized yet.');
-  anonymousExchange.tickerStream(async (markets) => {
-    if (logs) logger('M:' + monitorId, markets);
-
-    try {
-      markets.map(mkt => hydra.updateMemory(mkt.symbol, indexKeys.TICKER, null, mkt[1]));
-
-      const obj = {};
-      markets.map(mkt => obj[mkt.symbol] = mkt);
-      if (broadcastLabel && WSS) WSS.broadcast({ [broadcastLabel]: obj });
-
-      //simulação de book
-      const books = markets.map(mkt => {
-        const book = { symbol: mkt.symbol, bestAsk: mkt.close, bestBid: mkt.close };
-        hydra.updateMemory(mkt.symbol, indexKeys.BOOK, null, book);
-        return book;
-      })
-
-      if (WSS) WSS.broadcast({ book: books });
-      //fim simulação de book
-    } catch (err) {
-      if (logs) logger('M:' + monitorId, err)
-    }
-  })
-  logger('M:' + monitorId, 'Ticker Monitor has started!');
-}
-
 let book = [];
 function startBookMonitor(monitorId, broadcastLabel, logs) {
   if (!anonymousExchange) return new Error('Exchange Monitor not initialized yet.');
@@ -168,7 +140,7 @@ async function processChartData(monitorId, symbol, indexes, interval, ohlc, logs
 
   const memoryKeys = [];
 
-  indexes.map(index => {
+  indexes.map(async index => {
     const params = index.split('_');
     const indexName = params[0];
     params.splice(0, 1);
@@ -176,7 +148,7 @@ async function processChartData(monitorId, symbol, indexes, interval, ohlc, logs
     try {
       const calc = execCalc(indexName, ohlc, ...params);
       if (logs) logger('M:' + monitorId, `${index}_${interval} calculated: ${JSON.stringify(calc.current ? calc.current : calc)}`);
-      hydra.updateMemory(symbol, index, interval, calc, false);
+      await hydra.updateMemory(symbol, index, interval, calc, false);
 
       memoryKeys.push(beholder.parseMemoryKey(symbol, index, interval));
     } catch (err) {
@@ -222,8 +194,8 @@ function startChartMonitor(userId, monitorId, symbol, interval, indexes, broadca
     if (logs) logger('M:' + monitorId, lastCandle);
 
     try {
-      hydra.updateMemory(symbol, indexKeys.LAST_CANDLE, interval, { current: lastCandle, previous: previousCandle }, false);
-      hydra.updateMemory(symbol, indexKeys.PREVIOUS_CANDLE, interval, { current: previousCandle, previous: previousPreviousCandle }, false);
+      await hydra.updateMemory(symbol, indexKeys.LAST_CANDLE, interval, { current: lastCandle, previous: previousCandle }, false);
+      await hydra.updateMemory(symbol, indexKeys.PREVIOUS_CANDLE, interval, { current: previousCandle, previous: previousPreviousCandle }, false);
 
       if (broadcastLabel && WSS) sendMessage(userId, { [broadcastLabel]: lastCandle });
 
@@ -262,7 +234,7 @@ function startTickerMonitor(userId, monitorId, symbol, broadcastLabel, logs) {
     if (logs) logger('M:' + monitorId, data);
 
     try {
-      const results = await hydra.updateMemory(data.symbol, indexKeys.TICKER, null, newMemory);
+      const results = await hydra.updateMemory(data.symbol, indexKeys.TICKER, null, data);
       if (results) results.map(r => WSS.direct(userId, { notification: r }));
 
       if (WSS && broadcastLabel) WSS.direct(userId, { [broadcastLabel]: data });

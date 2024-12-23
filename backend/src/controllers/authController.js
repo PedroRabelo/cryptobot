@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const settingsRepository = require('../repositories/settingsRepository');
 const usersRepository = require('../repositories/usersRepository');
+const Cache = require('../utils/cache');
+const cache = new Cache();
 
 async function doLogin(req, res, next) {
   const email = req.body.email;
@@ -34,16 +36,14 @@ async function doLogin(req, res, next) {
   res.status(401).send('401 Unauthorized');
 }
 
-const blacklist = [];
-
-function doLogout(req, res, next) {
+async function doLogout(req, res, next) {
   const token = req.headers['authorization'];
-  blacklist.push(token);
-  res.sendStatus(200);
+  await cache.set(token, true, parseInt(process.env.JWT_EXPIRES));
+  return res.sendStatus(200);
 }
 
 function isBlacklisted(token) {
-  return blacklist.some(t => token === t);
+  return cache.get(token);
 }
 
 module.exports = {

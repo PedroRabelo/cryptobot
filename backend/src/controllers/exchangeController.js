@@ -18,10 +18,10 @@ async function loadBalance(userId, fiat) {
   let total = 0;
   await Promise.all(coins.map(async (coin) => {
     let available = parseFloat(info[coin].available);
-    if (available > 0) available = hydra.tryFiatConversion(coin, available, fiat);
+    if (available > 0) available = await hydra.tryFiatConversion(coin, available, fiat);
 
     let onOrder = parseFloat(info[coin].onOrder);
-    if (onOrder > 0) onOrder = hydra.tryFiatConversion(coin, onOrder);
+    if (onOrder > 0) onOrder = await hydra.tryFiatConversion(coin, onOrder);
 
     info[coin].fiatEstimate = available + onOrder;
     total += available + onOrder;

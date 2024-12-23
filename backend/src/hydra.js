@@ -1,6 +1,12 @@
 const { indexKeys } = require('./utils/indexes');
 const beholder = require('./beholder');
 
+const Cache = require('./utils/cache');
+const logger = require('./utils/logger');
+const cache = new Cache();
+
+const LOGS = process.env.HYDRA_LOGS === 'true'
+
 function getLightBook(order) {
   const orderCopy = { ...order };
   delete orderCopy.symbol;
@@ -21,7 +27,7 @@ async function updateBookMemory(symbol, index, value, executeAutomations = true)
   newMemory.previous = currentMemory ? currentMemory.current : converted;
   newMemory.current = converted;
 
-  return beholder.updateMemory(symbol, index, interval, newMemory, executeAutomations);
+  return setCache(symbol, index, interval, newMemory, executeAutomations);
 }
 
 async function updateTickerMemory(symbol, index, ticker, executeAutomations = true) {
@@ -31,7 +37,7 @@ async function updateTickerMemory(symbol, index, ticker, executeAutomations = tr
   newMemory.previous = currentMemory ? currentMemory.current : ticker;
   newMemory.current = ticker;
 
-  return beholder.updateMemory(symbol, index, interval, newMemory, executeAutomations);
+  return setCache(symbol, index, interval, newMemory, executeAutomations);
 }
 
 function getLightOrder(order) {
@@ -58,6 +64,15 @@ function getLightOrder(order) {
   return orderCopy;
 }
 
+async function setCache(symbol, index, interval, value, executeAutomations = true) {
+  const indexKey = interval ? `${index}_${interval}` : index;
+  const memoryKey = `${symbol}:${indexKey}`;
+
+  await cache.set(memoryKey, value, executeAutomations);
+
+  if (LOGS) logger('hydra', `Hydra memory updated: ${memoryKey} => ${JSON.stringify(value)}, executeAutomations? ${executeAutomations}`);
+}
+
 async function updateMemory(symbol, index, interval, value, executeAutomations = true) {
   if (value === undefined || value === null) return false;
   if (value.toJSON) value = value.toJSON();
@@ -66,23 +81,23 @@ async function updateMemory(symbol, index, interval, value, executeAutomations =
   if (index === indexKeys.BOOK) {
     return updateBookMemory(symbol, index, value, executeAutomations);
   } else if (index.startsWith(indexKeys.LAST_ORDER + "_")) {
-    return beholder.updateMemory(symbol, index, interval, getLightOrder(value), executeAutomations);
+    return setCache(symbol, index, interval, getLightOrder(value), executeAutomations);
   } else if (index === indexKeys.TICKER) {
     return updateTickerMemory(symbol, index, value, executeAutomations);
   } else {
-    return beholder.updateMemory(symbol, index, interval, value, executeAutomations);
+    return setCache(symbol, index, interval, value, executeAutomations);
   }
 }
 
 function deleteMemory(symbol, index, interval) {
   const indexKey = interval ? `${index}_${interval}` : index;
   const memoryKey = `${symbol}:${indexKey}`;
-  beholder.deleteMemory(memoryKey);
+  return cache.unset(memoryKey);
 }
 
-function clearWallet(userId) {
-  const balances = beholder.searchMemory(new RegExp(`^(.+:WALLET_${userId})$`));
-  balances.map(b => beholder.deleteMemory(b.key));
+async function clearWallet(userId) {
+  const balances = await searchMemory(new RegExp(`^(.+:WALLET_${userId})$`));
+  await Promise.all(balances.map(b => cache.unset(b.key)));
 }
 
 function updateBrain(automation) {
@@ -97,16 +112,16 @@ async function generateGrids(automation, levels, quantity, transaction) {
   return beholder.generateGrids(automation, levels, quantity, transaction);
 }
 
-function getMemory(symbol, index, interval) {
-  if (symbol && index) {
+async function getMemory(symbolOrKey, index = undefined, interval = undefined) {
+  if (symbolOrKey && index) {
     const indexKey = interval ? `${index}_${interval}` : index;
-    const memoryKey = `${symbol}:${indexKey}`;
+    const memoryKey = `${symbolOrKey}:${indexKey}`;
 
-    const result = beholder.getMemory(memoryKey);
-    return typeof result === 'object' ? { ...result } : result;
-  }
-
-  return beholder.getMemory();
+    return await cache.get(memoryKey);
+  } else if (symbolOrKey)
+    return cache.get(symbolOrKey);
+  else
+    return cache.search()
 }
 
 function getEval(prop) {
@@ -138,8 +153,9 @@ function flattenObject(obj) {
   return toReturn;
 }
 
-function getMemoryIndexes() {
-  return Object.entries(flattenObject(beholder.getMemory())).map(prop => {
+async function getMemoryIndexes() {
+  const MEMORY = await getMemory()
+  return Object.entries(flattenObject(MEMORY)).map(prop => {
     if (prop[0].indexOf('previous') !== -1 || prop[0].indexOf(':') === -1) return false;
     const propSplit = prop[0].split(':');
     return {
@@ -177,17 +193,22 @@ function getStableConversion(baseAsset, quoteAsset, baseQty) {
 
 const FIAT_COINS = ['BRL', 'EUR', 'GBP'];
 
-function getFiatConversion(stableCoin, fiatCoin, fiatQty) {
-  const book = beholder.getMemory(stableCoin + fiatCoin, 'BOOK', null);
+async function getFiatConversion(stableCoin, fiatCoin, fiatQty) {
+  const book = await getMemory(stableCoin + fiatCoin, 'BOOK', null);
   if (book) return parseFloat(fiatQty) / book.current.bestBid;
   return 0;
 }
 
-function searchMemory(regex) {
-  return beholder.searchMemory(regex)
+async function searchMemory() {
+  const MEMORY = await getMemory();
+  return Object.entries(MEMORY).filter(prop => regex.test(prop[0])).map(prop => {
+    return {
+      key: prop[0], value: prop[1]
+    }
+  });
 }
 
-function tryUSDConversion(baseAsset, baseQty) {
+async function tryUSDConversion(baseAsset, baseQty) {
   if (DOLLAR_COINS.includes(baseAsset)) return baseQty;
   if (FIAT_COINS.includes(baseAsset)) return getFiatConversion('USDT', baseAsset, baseQty);
 
@@ -199,17 +220,17 @@ function tryUSDConversion(baseAsset, baseQty) {
   return 0;
 }
 
-function tryFiatConversion(baseAsset, baseQty, fiat) {
+async function tryFiatConversion(baseAsset, baseQty, fiat) {
   if (fiat) fiat = fiat.toUpperCase();
   if (FIAT_COINS.includes(baseAsset) && baseAsset === fiat) return baseQty;
 
   const usd = tryUSDConversion(baseAsset, baseQty);
   if (fiat === 'USD' || !fiat) return usd;
 
-  let book = getMemory('USDT' + fiat, 'BOOK');
+  let book = await getMemory('USDT' + fiat, 'BOOK');
   if (book) usd * book.current.bestBid;
 
-  book = getMemory(fiat + 'USDT', 'BOOK');
+  book = await getMemory(fiat + 'USDT', 'BOOK');
   if (book) return usd / book.current.bestBid;
 
   return usd;

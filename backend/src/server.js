@@ -6,11 +6,14 @@ const usersRepository = require('./repositories/usersRepository');
 const hydra = require('./hydra');
 const agenda = require('./agenda');
 const logger = require('./utils/logger');
+const Cache = require('./utils/cache');
 
 (async () => {
   logger('system', 'Getting the default settings...');
   const settings = await settingsRepository.getDefaultSettings();
   if (!settings) return new Error('There is no settings');
+
+  const cache = new Cache();
 
   logger('system', 'Initializing the Beholder Brain...');
 

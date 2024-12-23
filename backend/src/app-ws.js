@@ -43,7 +43,7 @@ function corsValidation(origin) {
   return whitelist[0] === '*' || whitelist.includes(origin);
 }
 
-function verifyClient(info, callback) {
+async function verifyClient(info, callback) {
   logger('system', process.env.CORS_ORIGIN.startsWith(info.origin))
 
   if (!corsValidation(info.origin)) return callback(false, 401);
@@ -53,7 +53,8 @@ function verifyClient(info, callback) {
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      if (decoded && !authController.isBlacklisted(token) && !isConnected(decoded.id)) {
+      const isBlacklisted = await authController.isBlacklisted(token);
+      if (decoded && isBlacklisted && !isConnected(decoded.id)) {
         return callback(true)
       }
     } catch (err) {

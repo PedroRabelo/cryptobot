@@ -1,4 +1,4 @@
-const { getActiveUserMonitors } = require('../repositories/monitorsRepository');
+const { getActiveUserMonitors, monitorTypes } = require('../repositories/monitorsRepository');
 const { getActiveUsers } = require('../repositories/usersRepository');
 const hydra = require('../hydra');
 const indexes = require('../utils/indexes');
@@ -6,21 +6,27 @@ const agenda = require('../agenda');
 
 const USER_VARIABLES = [indexes.indexKeys.WALLET, indexes.indexKeys.LAST_ORDER]
 
-function getMemory(req, res, next) {
+async function getMemory(req, res, next) {
   let { symbol, index, interval } = req.params;
   if (USER_VARIABLES.includes(index))
     index = `${index}_${res.locals.token.id}`;
 
-  res.json(hydra.getMemory(symbol, index, interval));
+  const memory = await hydra.getMemory(symbol, index, interval);
+  res.json(memory);
 }
 
 async function getMemoryIndexes(req, res, next) {
   const userId = res.locals.token.id;
   const monitors = await getActiveUserMonitors(userId);
-  const userIndexes = monitors.map(m => m.indexes.split(',')).flat();
+  let userIndexes = [];
+  if (monitors && monitors.length) {
+    userIndexes = monitors.filter(m => m.indexes).map(m => m.indexes.split(',')).flat();
+    if (monitors.some(m => m.type === monitorTypes.TICKER)) userIndexes.push(monitorTypes.TICKER);
+  }
+
   userIndexes.push(indexes.indexKeys.LAST_CANDLE, indexes.indexKeys.BOOK, indexes.indexKeys.MINI_TICKER, `${indexes.indexKeys.WALLET}_${userId}`, `${indexes.indexKeys.LAST_ORDER}_${userId}`)
 
-  let memory = hydra.getMemoryIndexes();
+  let memory = await hydra.getMemoryIndexes();
   memory = userIndexes.map(uix => memory.filter(m => new RegExp(`^(${uix}(\.|$))`).test(m.variable))).flat();
   res.json(memory);
 }

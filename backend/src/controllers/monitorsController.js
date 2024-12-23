@@ -7,11 +7,11 @@ function startStreamMonitor(monitor) {
   switch (monitor.type) {
     case monitorTypes.CANDLES: {
       const indexes = monitor.indexes ? monitor.indexes.split(',') : [];
-      appEm.startChartMonitor(monitor.id, monitor.symbol, monitor.interval, indexes, monitor.broadcastLabel, monitor.logs);
+      appEm.startChartMonitor(monitor.userId, monitor.id, monitor.symbol, monitor.interval, indexes, monitor.broadcastLabel, monitor.logs);
       break;
     }
     case monitorTypes.TICKER: {
-      appEm.startTickerMonitor(monitor.id, monitor.symbol, monitor.broadcastLabel, monitor.logs);
+      appEm.startTickerMonitor(monitor.userId, monitor.id, monitor.symbol, monitor.broadcastLabel, monitor.logs);
       break;
     }
   }
